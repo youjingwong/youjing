@@ -3,7 +3,7 @@ import type { NextPage } from "next";
 const Home: NextPage = () => {
   return (
     <div className="container py-20">
-      <h1 className="text-2xl font-bold ">You Jing</h1>
+      <h1 className="text-2xl font-bold">You Jing</h1>
 
       <p className="mt-5">
         I'm a full stack developer in Malaysia and building systems and
