@@ -6,8 +6,12 @@ const Home: NextPage = () => {
       <h1 className="text-2xl font-bold">You Jing</h1>
 
       <p className="mt-5">
-        I'm a full stack developer in Malaysia and building systems and
-        platforms. Started off scripting games with{" "}
+        I&apos;m a full stack developer in Malaysia and building systems and
+        platforms. Previously mentored hundreds of bootcamp students, and also
+        contracted for startups and enterprises, small and large.
+      </p>
+      <p>
+        Started off scripting games with{" "}
         <a
           href="https://www.autoitscript.com/site/"
           className="underline"
@@ -16,24 +20,17 @@ const Home: NextPage = () => {
         >
           AutoIt
         </a>{" "}
-        in 2012. Since then I've worked with Ruby on Rails, Next.js, native iOS
-        apps with Swift, Cordova apps, and other technologies.
+        in 2012. Learned coding via MOOC courses, a Ruby on Rails bootcamp in
+        Malaysia, and an iOS bootcamp in San Francisco. Always curious and
+        flexible, I have worked on a variety of domains, including but not
+        limited to two sided platforms, meal planning, warehouse management
+        systems, and call center systems.
       </p>
-      <hr className="mt-3"></hr>
-      <h2 className="text-xl mt-4 font-semibold">Community work</h2>
+      <hr className="my-5"></hr>
+      <h2 className="text-xl mt-4 font-semibold">Previous/Ongoing Work</h2>
+
       <div>
-        <ul className="list-disc">
-          <li>
-            <a
-              href="https://www.facebook.com/groups/makan.malaysia/"
-              className="underline"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Pulang Mengundi
-            </a>
-          </li>
-        </ul>
+        <p></p>
       </div>
     </div>
   );
