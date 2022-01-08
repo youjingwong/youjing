@@ -35,7 +35,7 @@ const Home: NextPage = () => {
         return (
           <div className="mt-4" key={index}>
             <p className="mt-3">
-              <Link href="/work/smithkit">
+              <Link href={workSummary.href}>
                 <a className="underline">
                   <strong>{workSummary.title}</strong>
                 </a>

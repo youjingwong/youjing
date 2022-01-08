@@ -37,6 +37,7 @@ const SmithKit = ({}: SmithKitProps): JSX.Element => {
             src={landingPage}
             alt="landing-page"
             placeholder="blur"
+            sizes="(min-width: 1024px) 1024px, 100vw"
             layout="responsive"
           />
         </div>
@@ -46,6 +47,7 @@ const SmithKit = ({}: SmithKitProps): JSX.Element => {
             src={mealPlanning}
             alt="meal-planning"
             placeholder="blur"
+            sizes="(min-width: 1024px) 1024px, 100vw"
             layout="responsive"
           />
         </div>
@@ -56,6 +58,7 @@ const SmithKit = ({}: SmithKitProps): JSX.Element => {
             src={recipeManagement}
             alt="recipe-management"
             placeholder="blur"
+            sizes="(min-width: 1024px) 1024px, 100vw"
             layout="responsive"
           />
         </div>
@@ -66,6 +69,7 @@ const SmithKit = ({}: SmithKitProps): JSX.Element => {
             src={nutritionalSummary}
             alt="nutritional-summary"
             placeholder="blur"
+            sizes="(min-width: 1024px) 1024px, 100vw"
             layout="responsive"
           />
         </div>
