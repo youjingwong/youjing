@@ -7,7 +7,32 @@
 }
 
 p {
-  line-height: 1.75rem;
+  font-size: 1rem;
+  line-height: 1.75;
   margin-top: 1.25rem;
   margin-bottom: 1.25rem;
+}
+
+@media only screen and (max-width: theme("screens.sm")) {
+  p {
+    font-size: 0.875rem;
+    line-height: 1.75;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+  }
+}
+
+h1 {
+  font-size: theme("fontSize.2xl");
+  font-weight: bold;
+}
+
+h2 {
+  font-size: theme("fontSize.xl");
+  font-weight: bold;
+}
+
+h6 {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
 }

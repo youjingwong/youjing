@@ -1,9 +1,11 @@
 import type { NextPage } from "next";
+import Link from "next/link";
+import { workSummaries } from "../src/data/work_summaries";
 
 const Home: NextPage = () => {
   return (
     <div className="container py-20">
-      <h1 className="text-2xl font-bold">You Jing</h1>
+      <h1>You Jing</h1>
 
       <p className="mt-5">
         I&apos;m a full stack developer in Malaysia and building systems and
@@ -27,11 +29,22 @@ const Home: NextPage = () => {
         systems, and call center systems.
       </p>
       <hr className="my-5"></hr>
-      <h2 className="text-xl mt-4 font-semibold">Previous/Ongoing Work</h2>
+      <h2 className="mt-4 ">Work</h2>
 
-      <div>
-        <p></p>
-      </div>
+      {workSummaries.map((workSummary, index) => {
+        return (
+          <div className="mt-4" key={index}>
+            <p className="mt-3">
+              <Link href="/work/smithkit">
+                <a className="underline">
+                  <strong>{workSummary.title}</strong>
+                </a>
+              </Link>{" "}
+              {workSummary.body}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 };
