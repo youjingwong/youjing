@@ -1,6 +1,7 @@
 import Image from "next/image";
 import React from "react";
 import home from "../../public/work/bountysource/home.png";
+import salt from "../../public/work/bountysource/salt.png";
 import BackToHomeLink from "../../src/data/components/BackToHomeLink";
 
 interface StoneAndChalkProps {}
@@ -35,6 +36,15 @@ const Bountysource = ({}: StoneAndChalkProps): JSX.Element => {
           <Image
             src={home}
             alt="home"
+            placeholder="blur"
+            sizes="(min-width: 1024px) 1024px, 100vw"
+            layout="responsive"
+          />
+        </div>
+        <div className="mt-3">
+          <Image
+            src={salt}
+            alt="salt"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
             layout="responsive"
