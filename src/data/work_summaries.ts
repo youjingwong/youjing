@@ -17,7 +17,16 @@ export const workSummaries = [
     body: `- Lead and primary developer for a custom built ERP system. Sales and distribution module, 
     Material management module with automated warehouse bin assignment, Fleet tracking and dispatch module, Contact center module, warranty management module.`,
   },
-
+  {
+    title: "Bountysource",
+    href: "/work/bountysource",
+    body: `- Lead the BountySource development team delivering solutions that include design, implementing and supporting BountySource functions for crypto bounties, reskin, and integration with web3.js and MetaMask.`,
+  },
+  {
+    title: "My PPE Hub",
+    href: "/work/myppehub",
+    body: `- Founder and lead developer for myPPEHub.com, a centralised hub that consolidates PPE requests from the front-liners fighting COVID-19 in Malaysia.`,
+  },
   {
     title: "Stone & Chalk",
     href: "/work/stoneandchalk",
