@@ -15,6 +15,6 @@ export const workSummaries = [
   {
     title: "Stone & Chalk",
     href: "/work/stoneandchalk",
-    body: `- Landing page and digital hub`,
+    body: `- Implemented a beautifully designed website and a digital hub for users of Stone & Chalk`,
   },
 ];
