@@ -4,6 +4,7 @@ import landingPage from "../../public/work/smithkit/landing_page.png";
 import mealPlanning from "../../public/work/smithkit/meal_planning.png";
 import nutritionalSummary from "../../public/work/smithkit/nutritional_summary.png";
 import recipeManagement from "../../public/work/smithkit/recipe_management.png";
+import BackToHomeLink from "../../src/data/components/BackToHomeLink";
 
 interface SmithKitProps {}
 
@@ -12,7 +13,7 @@ const SmithKit = ({}: SmithKitProps): JSX.Element => {
     <div className="container py-20">
       <h1>Smithkit</h1>
       <div className="text-gray-400">
-        Ruby on Rails · React · Next.js · Chargebee
+        Ruby on Rails · React · Next.js · Chargebee · Material UI
       </div>
       <a
         className="underline text-sm"
@@ -22,6 +23,8 @@ const SmithKit = ({}: SmithKitProps): JSX.Element => {
       >
         Site Link
       </a>
+
+      <BackToHomeLink />
 
       <div className="pt-3"></div>
       <ul className="list-disc pl-5">

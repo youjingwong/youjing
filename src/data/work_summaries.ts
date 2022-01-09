@@ -10,6 +10,11 @@ export const workSummaries = [
     title: "Tayarlo",
     href: "/work/tayarlo",
     body: `- Lead and primary developer for a custom built ERP system. Sales and distribution module, 
-    Material management module with automated warehouse bin assignment, Fleet tracking and dispatch module, Contact center module`,
+    Material management module with automated warehouse bin assignment, Fleet tracking and dispatch module, Contact center module, warranty management module`,
+  },
+  {
+    title: "Stone & Chalk",
+    href: "/work/stoneandchalk",
+    body: `- Landing page and digital hub`,
   },
 ];
