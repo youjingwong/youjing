@@ -28,7 +28,7 @@ const Home: NextPage = () => {
         limited to two sided platforms, meal planning, warehouse management
         systems, and call center systems.
       </p>
-      <hr className="my-5"></hr>
+      <hr className="my-8"></hr>
       <h2 className="mt-4 ">Work</h2>
 
       {workSummaries.map((workSummary, index) => {
@@ -45,6 +45,35 @@ const Home: NextPage = () => {
           </div>
         );
       })}
+      <hr className="my-10"></hr>
+      <div>
+        <a
+          href="https://www.linkedin.com/in/you-jing-wong/"
+          className="underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          LinkedIn
+        </a>
+        <span className="mx-2">·</span>
+        <a
+          href="https://github.com/youjingwong/"
+          className="underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Github
+        </a>
+        <span className="mx-2">·</span>
+        <a
+          href="https://twitter.com/youjingwong"
+          className="underline"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Twitter
+        </a>
+      </div>
     </div>
   );
 };
