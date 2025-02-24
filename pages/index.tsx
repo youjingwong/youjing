@@ -13,11 +13,11 @@ const Home: NextPage = () => {
         <h1>You Jing</h1>
 
         <div className="text-right">
-          <Link href="/blogs">
-            <a className="underline ml-3">Blogs</a>
+          <Link href="/blogs" className="underline ml-3">
+            Blogs
           </Link>
-          <Link href="/">
-            <a className="disabled:bg-gray-50 ml-3">About</a>
+          <Link href="/" className="disabled:bg-gray-50 ml-3">
+            About
           </Link>
         </div>
         <p className="mt-5">
@@ -48,10 +48,8 @@ const Home: NextPage = () => {
           return (
             <div className="mt-4" key={index}>
               <p className="mt-3">
-                <Link href={workSummary.href}>
-                  <a className="underline">
-                    <strong>{workSummary.title}</strong>
-                  </a>
+                <Link href={workSummary.href} className="underline">
+                  <strong>{workSummary.title}</strong>
                 </Link>{" "}
                 {workSummary.body}
               </p>

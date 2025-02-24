@@ -7,11 +7,11 @@ const Blogs: NextPage = () => {
       <h1>Blogs</h1>
 
       <div className="text-right">
-        <Link href="/blogs">
-          <a className="disabled:bg-gray-50 ml-3">Blogs</a>
+        <Link href="/blogs" className="disabled:bg-gray-50 ml-3">
+          Blogs
         </Link>
-        <Link href="/">
-          <a className="underline ml-3">About</a>
+        <Link href="/" className="underline ml-3">
+          About
         </Link>
       </div>
     </div>
