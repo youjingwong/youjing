@@ -16,7 +16,7 @@ const SEO = {
     type: 'website',
     images: [
       {
-        url: '/api/og',
+        url: '/og/id-marking.png',
         width: 1200,
         height: 630,
         alt: 'ID Marking Tool - MyKad Cross Out & Watermark',
