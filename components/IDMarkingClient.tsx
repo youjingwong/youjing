@@ -380,7 +380,7 @@ export default function IDMarkingClient() {
         <h1 className="text-3xl font-bold text-center mb-8">ID Marking</h1>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Front IC Section */}
+          {/* Front ID Section */}
           <div>
             <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
               <h2 className="text-xl font-semibold mb-4">Front ID</h2>
@@ -497,7 +497,7 @@ export default function IDMarkingClient() {
             )}
           </div>
 
-          {/* Back IC Section */}
+          {/* Back ID Section */}
           <div>
             <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
               <h2 className="text-xl font-semibold mb-4">Back ID</h2>
