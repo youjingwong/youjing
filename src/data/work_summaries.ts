@@ -1,5 +1,10 @@
 export const workSummaries = [
   {
+    title: "ID Marking",
+    href: "/id-marking",
+    body: `- A tool for crossing out and watermarking Malaysian IC/MyKad images. Features include image scaling, watermark text customization, rotation control, and combined image download.`,
+  },
+  {
     title: "Pulang Mengundi",
     href: "/work/pulang_mengundi",
     body: `- Founding member and lead developer of an open source and neutral platform that aims to connect Malaysians with other Malaysians to help them travel home to vote. Successfully connected more than 10,000 Malaysian and matched more than RM105,000 from donors to people who needed help.`,
@@ -8,7 +13,7 @@ export const workSummaries = [
     title: "SmithKit",
     href: "/work/smithkit",
     body: `- Fullstack development on a web based meal planner SAAS.
-    All-in-one digital meal planner taking the ‘ugh’ out of home
+    All-in-one digital meal planner taking the 'ugh' out of home
     cooking.`,
   },
   {
