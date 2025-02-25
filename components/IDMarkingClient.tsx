@@ -34,10 +34,6 @@ export default function IDMarkingClient() {
   const [backImage, setBackImage] = useState<File | null>(null);
   const [frontSettings, setFrontSettings] = useState<ProcessingSettings>(defaultSettings);
   const [backSettings, setBackSettings] = useState<ProcessingSettings>(defaultSettings);
-  const [processedFrontUrl, setProcessedFrontUrl] = useState<string>('');
-  const [processedBackUrl, setProcessedBackUrl] = useState<string>('');
-  const frontCanvasRef = useRef<HTMLCanvasElement>(null);
-  const backCanvasRef = useRef<HTMLCanvasElement>(null);
   const frontEditCanvasRef = useRef<HTMLCanvasElement>(null);
   const backEditCanvasRef = useRef<HTMLCanvasElement>(null);
   const dragStateRef = useRef<DragState>({
@@ -192,12 +188,13 @@ export default function IDMarkingClient() {
     dragStateRef.current.isDragging = false;
   };
 
-  const handleDownload = (url: string, suffix: string) => {
+  const handleDownload = (canvas: HTMLCanvasElement, suffix: string) => {
     // For iOS Chrome compatibility
     const filename = `ic-${suffix}-crossed.jpg`;
 
-    // Try the traditional approach first
     try {
+      // Get data URL directly from the canvas
+      const url = canvas.toDataURL('image/jpeg', 1.0);
       const link = document.createElement('a');
       link.href = url;
       link.download = filename;
@@ -207,26 +204,25 @@ export default function IDMarkingClient() {
       const isChrome = /CriOS/.test(navigator.userAgent); // Chrome on iOS
 
       if (isIOS && isChrome) {
-        // Convert base64 to blob for better compatibility
-        fetch(url)
-          .then(res => res.blob())
-          .then(blob => {
-            const blobUrl = window.URL.createObjectURL(blob);
-            // Create new link with blob URL
-            const newLink = document.createElement('a');
-            newLink.href = blobUrl;
-            newLink.download = filename;
+        // Convert canvas data to blob for better compatibility
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          const blobUrl = window.URL.createObjectURL(blob);
+          // Create new link with blob URL
+          const newLink = document.createElement('a');
+          newLink.href = blobUrl;
+          newLink.download = filename;
 
-            // Try download attribute first
-            newLink.click();
+          // Try download attribute first
+          newLink.click();
 
-            // Fallback: open in new tab
-            setTimeout(() => {
-              window.open(blobUrl, '_blank');
-              // Clean up the blob URL
-              window.URL.revokeObjectURL(blobUrl);
-            }, 100);
-          });
+          // Fallback: open in new tab
+          setTimeout(() => {
+            window.open(blobUrl, '_blank');
+            // Clean up the blob URL
+            window.URL.revokeObjectURL(blobUrl);
+          }, 100);
+        }, 'image/jpeg', 1.0);
       } else {
         // For other browsers, use the normal approach
         document.body.appendChild(link);
@@ -235,48 +231,35 @@ export default function IDMarkingClient() {
       }
     } catch (error) {
       console.error('Download error:', error);
-      // Fallback: open in new tab
+      // Fallback: open in new tab with data URL
+      const url = canvas.toDataURL('image/jpeg', 1.0);
       window.open(url, '_blank');
     }
   };
 
   const handleCombinedDownload = () => {
-    if (!processedFrontUrl || !processedBackUrl) return;
+    if (!frontEditCanvasRef.current || !backEditCanvasRef.current) return;
 
-    // Create temporary images to get dimensions
-    const frontImg = new Image();
-    const backImg = new Image();
+    // Create a canvas to combine images
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    frontImg.src = processedFrontUrl;
-    backImg.src = processedBackUrl;
+    // Set canvas size to fit both images vertically
+    canvas.width = Math.max(frontEditCanvasRef.current.width, backEditCanvasRef.current.width);
+    canvas.height = frontEditCanvasRef.current.height + backEditCanvasRef.current.height;
 
-    // Wait for both images to load
-    Promise.all([
-      new Promise(resolve => frontImg.onload = resolve),
-      new Promise(resolve => backImg.onload = resolve)
-    ]).then(() => {
-      // Create a canvas to combine images
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+    // Fill with white background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Set canvas size to fit both images vertically
-      canvas.width = Math.max(frontImg.width, backImg.width);
-      canvas.height = frontImg.height + backImg.height;
+    // Draw front image at the top
+    ctx.drawImage(frontEditCanvasRef.current, 0, 0);
+    // Draw back image below front image
+    ctx.drawImage(backEditCanvasRef.current, 0, frontEditCanvasRef.current.height);
 
-      // Fill with white background
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw front image at the top
-      ctx.drawImage(frontImg, 0, 0);
-      // Draw back image below front image
-      ctx.drawImage(backImg, 0, frontImg.height);
-
-      // Convert to JPEG and handle download with the same iOS Chrome compatibility
-      const combinedUrl = canvas.toDataURL('image/jpeg', 1.0);
-      handleDownload(combinedUrl, 'combined');
-    });
+    // Download the combined image
+    handleDownload(canvas, 'combined');
   };
 
   const processImage = (
@@ -361,44 +344,33 @@ export default function IDMarkingClient() {
   };
 
   useEffect(() => {
-    const updateCanvases = async (
+    const updateCanvas = async (
       image: File,
       editCanvas: HTMLCanvasElement | null,
-      previewCanvas: HTMLCanvasElement | null,
-      settings: ProcessingSettings,
-      setPreviewUrl: (url: string) => void,
-      isNearResizeHandle = false
+      settings: ProcessingSettings
     ) => {
       const img = new Image();
       img.src = URL.createObjectURL(image);
       await new Promise((resolve) => (img.onload = resolve));
 
-      if (previewCanvas) {
-        processImage(previewCanvas, img, settings, false);
-        setPreviewUrl(previewCanvas.toDataURL('image/jpeg', 1.0));
-      }
       if (editCanvas) {
         processImage(editCanvas, img, settings, true);
       }
     };
 
     if (frontImage) {
-      updateCanvases(
+      updateCanvas(
         frontImage,
         frontEditCanvasRef.current,
-        frontCanvasRef.current,
-        frontSettings,
-        setProcessedFrontUrl
+        frontSettings
       );
     }
 
     if (backImage) {
-      updateCanvases(
+      updateCanvas(
         backImage,
         backEditCanvasRef.current,
-        backCanvasRef.current,
-        backSettings,
-        setProcessedBackUrl
+        backSettings
       );
     }
   }, [frontImage, backImage, frontSettings, backSettings]);
@@ -513,24 +485,14 @@ export default function IDMarkingClient() {
                       </div>
                     )}
                   </div>
-                </div>
-
-                <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">Front Preview</h2>
-                  <canvas ref={frontCanvasRef} className="hidden" />
-                  {processedFrontUrl && (
-                    <div className="relative">
-                      <img src={processedFrontUrl} alt="Processed Front IC" className="w-full rounded-lg mb-4" />
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => handleDownload(processedFrontUrl, 'front')}
-                          className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 border border-gray-600"
-                        >
-                          Download Front
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex justify-center mt-4">
+                    <button
+                      onClick={() => frontEditCanvasRef.current && handleDownload(frontEditCanvasRef.current, 'front')}
+                      className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 border border-gray-600"
+                    >
+                      Download Front
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -633,24 +595,14 @@ export default function IDMarkingClient() {
                       </div>
                     )}
                   </div>
-                </div>
-
-                <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">Back Preview</h2>
-                  <canvas ref={backCanvasRef} className="hidden" />
-                  {processedBackUrl && (
-                    <div className="relative">
-                      <img src={processedBackUrl} alt="Processed Back IC" className="w-full rounded-lg mb-4" />
-                      <div className="flex justify-center">
-                        <button
-                          onClick={() => handleDownload(processedBackUrl, 'back')}
-                          className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 border border-gray-600"
-                        >
-                          Download Back
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex justify-center mt-4">
+                    <button
+                      onClick={() => backEditCanvasRef.current && handleDownload(backEditCanvasRef.current, 'back')}
+                      className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 border border-gray-600"
+                    >
+                      Download Back
+                    </button>
+                  </div>
                 </div>
               </>
             )}
