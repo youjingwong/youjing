@@ -119,14 +119,29 @@ export default function IDMarkingClient() {
     const rotatedX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
     const rotatedY = dx * Math.sin(-angle) + dy * Math.cos(-angle);
 
+    // Get text metrics for accurate hitbox
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.save();
+    ctx.font = `${settings.textSize}px "Outfit"`;
+    const textMetrics = ctx.measureText(settings.text);
+    const textWidth = textMetrics.width;
+    const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
+    const lineExtension = 50; // Extra length beyond text on each side
+    const lineSpacing = textHeight * 1.2; // Space between text and lines
+    ctx.restore();
+
+    // Calculate hitbox dimensions based on text metrics
+    const hitboxWidth = textWidth + (lineExtension * 2); // Text width plus line extensions
+    const hitboxHeight = (lineSpacing * 2) + textHeight; // Height including lines and text
+
     // Check if point is within watermark bounds
-    const boxWidth = 400;
-    const boxHeight = 100;
     const isInBox =
-      rotatedX >= -100 && // left bound
-      rotatedX <= boxWidth - 100 && // right bound
-      rotatedY >= -50 && // top bound
-      rotatedY <= boxHeight - 50; // bottom bound
+      rotatedX >= -hitboxWidth / 2 && // left bound
+      rotatedX <= hitboxWidth / 2 && // right bound
+      rotatedY >= -hitboxHeight / 2 && // top bound
+      rotatedY <= hitboxHeight / 2; // bottom bound
 
     if (isInBox) {
       dragStateRef.current = {
@@ -149,24 +164,53 @@ export default function IDMarkingClient() {
 
     const { x, y } = getCanvasPosition(e, canvas);
 
+    // Transform coordinates to check hover state
+    const dx = x - settings.xPosition;
+    const dy = y - settings.yPosition;
+    const angle = (settings.rotation * Math.PI) / 180;
+    const rotatedX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
+    const rotatedY = dx * Math.sin(-angle) + dy * Math.cos(-angle);
+
+    // Get text metrics for accurate hitbox
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.save();
+    ctx.font = `${settings.textSize}px "Outfit"`;
+    const textMetrics = ctx.measureText(settings.text);
+    const textWidth = textMetrics.width;
+    const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
+    const lineExtension = 50;
+    const lineSpacing = textHeight * 1.2;
+    ctx.restore();
+
+    // Calculate hitbox dimensions based on text metrics
+    const hitboxWidth = textWidth + (lineExtension * 2);
+    const hitboxHeight = (lineSpacing * 2) + textHeight;
+
+    const isInBox =
+      rotatedX >= -hitboxWidth / 2 &&
+      rotatedX <= hitboxWidth / 2 &&
+      rotatedY >= -hitboxHeight / 2 &&
+      rotatedY <= hitboxHeight / 2;
+
+    // Update debug info
+    setDebugInfo([
+      `Mouse: (${Math.round(x)}, ${Math.round(y)})`,
+      `Rotated: (${Math.round(rotatedX)}, ${Math.round(rotatedY)})`,
+      `Text Center: (${Math.round(settings.xPosition)}, ${Math.round(settings.yPosition)})`,
+      `Text Size: ${settings.textSize}px`,
+      `Text Width: ${Math.round(textWidth)}px`,
+      `Text Height: ${Math.round(textHeight)}px`,
+      `Hit Box: ${Math.round(hitboxWidth)}x${Math.round(hitboxHeight)}`,
+      `Hit Box X: ${Math.round(-hitboxWidth / 2)} to ${Math.round(hitboxWidth / 2)}`,
+      `Hit Box Y: ${Math.round(-hitboxHeight / 2)} to ${Math.round(hitboxHeight / 2)}`,
+      `In Box: ${isInBox}`,
+      `Rotation: ${settings.rotation}°`,
+    ]);
+
     // Update cursor style based on hover position (mouse only)
     if (!dragStateRef.current.isDragging && !('touches' in e)) {
-      // Transform coordinates to check hover state
-      const dx = x - settings.xPosition;
-      const dy = y - settings.yPosition;
-      const angle = (settings.rotation * Math.PI) / 180;
-      const rotatedX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
-      const rotatedY = dx * Math.sin(-angle) + dy * Math.cos(-angle);
-
-      const boxWidth = 400;
-      const boxHeight = 100;
-
-      const isInBox =
-        rotatedX >= -100 &&
-        rotatedX <= boxWidth - 100 &&
-        rotatedY >= -50 &&
-        rotatedY <= boxHeight - 50;
-
       canvas.style.cursor = isInBox ? 'move' : 'default';
       return;
     }
@@ -297,17 +341,8 @@ export default function IDMarkingClient() {
     ctx.translate(settings.xPosition, settings.yPosition);
     ctx.rotate((settings.rotation * Math.PI) / 180);
 
-    // Draw bounding box first (behind everything)
-    ctx.strokeStyle = 'rgba(33, 150, 243, 0.5)';  // Semi-transparent blue
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
-    const boxWidth = 400;
-    const boxHeight = 100;
-    ctx.strokeRect(-100, -50, boxWidth, boxHeight);
-    ctx.setLineDash([]);
-
     // Set up text properties
-    ctx.font = `${settings.textSize}px Arial`;
+    ctx.font = `${settings.textSize}px "Outfit"`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
