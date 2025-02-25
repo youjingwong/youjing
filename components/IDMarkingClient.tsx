@@ -79,26 +79,38 @@ export default function IDMarkingClient() {
     }
   };
 
-  const getCanvasMousePosition = (e: React.MouseEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
+  const getCanvasPosition = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
+    let clientX, clientY;
+
+    if ('touches' in e) {
+      // Touch event
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      // Mouse event
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
     return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY
     };
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>, isFront: boolean) => {
+  const handleStart = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, isFront: boolean) => {
     e.preventDefault();
     const canvas = isFront ? frontEditCanvasRef.current : backEditCanvasRef.current;
     const settings = isFront ? frontSettings : backSettings;
     if (!canvas) return;
 
-    const { x, y } = getCanvasMousePosition(e, canvas);
+    const { x, y } = getCanvasPosition(e, canvas);
 
-    // Transform click coordinates to account for watermark rotation
+    // Transform click/touch coordinates to account for watermark rotation
     const centerX = settings.xPosition;
     const centerY = settings.yPosition;
     const angle = (settings.rotation * Math.PI) / 180;
@@ -132,17 +144,17 @@ export default function IDMarkingClient() {
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>, isFront: boolean) => {
+  const handleMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, isFront: boolean) => {
     e.preventDefault();
     const canvas = isFront ? frontEditCanvasRef.current : backEditCanvasRef.current;
     const settings = isFront ? frontSettings : backSettings;
     const setSettings = isFront ? setFrontSettings : setBackSettings;
     if (!canvas) return;
 
-    const { x, y } = getCanvasMousePosition(e, canvas);
+    const { x, y } = getCanvasPosition(e, canvas);
 
-    // Update cursor style based on hover position
-    if (!dragStateRef.current.isDragging) {
+    // Update cursor style based on hover position (mouse only)
+    if (!dragStateRef.current.isDragging && !('touches' in e)) {
       // Transform coordinates to check hover state
       const dx = x - settings.xPosition;
       const dy = y - settings.yPosition;
@@ -158,16 +170,6 @@ export default function IDMarkingClient() {
         rotatedX <= boxWidth - 100 &&
         rotatedY >= -50 &&
         rotatedY <= boxHeight - 50;
-
-      // Update debug info
-      setDebugInfo([
-        `Mouse: (${x.toFixed(0)}, ${y.toFixed(0)})`,
-        `Center: (${settings.xPosition.toFixed(0)}, ${settings.yPosition.toFixed(0)})`,
-        `Relative to center: (${dx.toFixed(0)}, ${dy.toFixed(0)})`,
-        `Rotated: (${rotatedX.toFixed(0)}, ${rotatedY.toFixed(0)})`,
-        `In box: ${isInBox}`,
-        `Box bounds: [-100,${boxWidth - 100}] x [-50,${boxHeight - 50}]`
-      ]);
 
       canvas.style.cursor = isInBox ? 'move' : 'default';
       return;
@@ -186,7 +188,7 @@ export default function IDMarkingClient() {
     }
   };
 
-  const handleMouseUp = () => {
+  const handleEnd = () => {
     dragStateRef.current.isDragging = false;
   };
 
@@ -463,10 +465,13 @@ export default function IDMarkingClient() {
                     <canvas
                       ref={frontEditCanvasRef}
                       className="w-full rounded-lg touch-none bg-white"
-                      onMouseDown={(e) => handleMouseDown(e, true)}
-                      onMouseMove={(e) => handleMouseMove(e, true)}
-                      onMouseUp={handleMouseUp}
-                      onMouseLeave={handleMouseUp}
+                      onMouseDown={(e) => handleStart(e, true)}
+                      onMouseMove={(e) => handleMove(e, true)}
+                      onMouseUp={handleEnd}
+                      onMouseLeave={handleEnd}
+                      onTouchStart={(e) => handleStart(e, true)}
+                      onTouchMove={(e) => handleMove(e, true)}
+                      onTouchEnd={handleEnd}
                     />
                     {!frontImage && (
                       <div className="absolute inset-0 flex items-center justify-center">
@@ -580,10 +585,13 @@ export default function IDMarkingClient() {
                     <canvas
                       ref={backEditCanvasRef}
                       className="w-full rounded-lg touch-none bg-white"
-                      onMouseDown={(e) => handleMouseDown(e, false)}
-                      onMouseMove={(e) => handleMouseMove(e, false)}
-                      onMouseUp={handleMouseUp}
-                      onMouseLeave={handleMouseUp}
+                      onMouseDown={(e) => handleStart(e, false)}
+                      onMouseMove={(e) => handleMove(e, false)}
+                      onMouseUp={handleEnd}
+                      onMouseLeave={handleEnd}
+                      onTouchStart={(e) => handleStart(e, false)}
+                      onTouchMove={(e) => handleMove(e, false)}
+                      onTouchEnd={handleEnd}
                     />
                     {!backImage && (
                       <div className="absolute inset-0 flex items-center justify-center">
