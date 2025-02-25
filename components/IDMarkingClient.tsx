@@ -412,13 +412,6 @@ export default function IDMarkingClient() {
 
   return (
     <div className="min-h-screen bg-black text-white py-8">
-      {/* Debug info overlay */}
-      <div className="fixed top-4 right-4 bg-black bg-opacity-75 p-4 rounded-lg font-mono text-sm z-50">
-        {debugInfo.map((text, i) => (
-          <div key={i} className="whitespace-pre">{text}</div>
-        ))}
-      </div>
-
       <div className="max-w-7xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-center mb-8">MyKad Cross Out & Watermark Tool</h1>
 
