@@ -193,12 +193,51 @@ export default function IDMarkingClient() {
   };
 
   const handleDownload = (url: string, suffix: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `ic-${suffix}-crossed.jpg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // For iOS Chrome compatibility
+    const filename = `ic-${suffix}-crossed.jpg`;
+
+    // Try the traditional approach first
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+
+      // iOS Chrome workaround: open in new tab if download attribute is not supported
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isChrome = /CriOS/.test(navigator.userAgent); // Chrome on iOS
+
+      if (isIOS && isChrome) {
+        // Convert base64 to blob for better compatibility
+        fetch(url)
+          .then(res => res.blob())
+          .then(blob => {
+            const blobUrl = window.URL.createObjectURL(blob);
+            // Create new link with blob URL
+            const newLink = document.createElement('a');
+            newLink.href = blobUrl;
+            newLink.download = filename;
+
+            // Try download attribute first
+            newLink.click();
+
+            // Fallback: open in new tab
+            setTimeout(() => {
+              window.open(blobUrl, '_blank');
+              // Clean up the blob URL
+              window.URL.revokeObjectURL(blobUrl);
+            }, 100);
+          });
+      } else {
+        // For other browsers, use the normal approach
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('Download error:', error);
+      // Fallback: open in new tab
+      window.open(url, '_blank');
+    }
   };
 
   const handleCombinedDownload = () => {
@@ -234,14 +273,9 @@ export default function IDMarkingClient() {
       // Draw back image below front image
       ctx.drawImage(backImg, 0, frontImg.height);
 
-      // Convert to JPEG and download
+      // Convert to JPEG and handle download with the same iOS Chrome compatibility
       const combinedUrl = canvas.toDataURL('image/jpeg', 1.0);
-      const link = document.createElement('a');
-      link.href = combinedUrl;
-      link.download = 'ic-combined-crossed.jpg';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      handleDownload(combinedUrl, 'combined');
     });
   };
 
