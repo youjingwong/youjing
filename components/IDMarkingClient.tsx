@@ -19,8 +19,18 @@ interface DragState {
   type: 'move' | 'rotate' | 'resize' | null;
 }
 
+// Get default text from URL parameter or use fallback
+const getDefaultText = () => {
+  if (typeof window !== 'undefined') {
+    const urlParams = new URLSearchParams(window.location.search);
+    const textParam = urlParams.get('text');
+    return textParam ? decodeURIComponent(textParam) : 'FOR PRIVATE USE ONLY';
+  }
+  return 'FOR PRIVATE USE ONLY';
+};
+
 const defaultSettings: ProcessingSettings = {
-  text: 'FOR PRIVATE USE ONLY',
+  text: 'FOR PRIVATE USE ONLY', // This will be overridden in useEffect
   lineWidth: 5,
   textSize: 48,
   rotation: -45,
@@ -45,6 +55,13 @@ export default function IDMarkingClient() {
     type: null,
   });
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
+
+  // Initialize settings with URL parameter text if available
+  useEffect(() => {
+    const defaultText = getDefaultText();
+    setFrontSettings(prev => ({ ...prev, text: defaultText }));
+    setBackSettings(prev => ({ ...prev, text: defaultText }));
+  }, []);
 
   const handleImageUpload = async (file: File, isFront: boolean) => {
     if (!file) return;
@@ -648,6 +665,17 @@ export default function IDMarkingClient() {
             </button>
           </div>
         )}
+
+        {/* Help Section */}
+        <div className="mt-12 bg-gray-900 rounded-lg shadow p-6">
+          <h2 className="text-xl font-semibold mb-4">Tips</h2>
+          <div className="text-gray-300 space-y-2">
+            <p>• Drag the watermark to position it on the image</p>
+            <p>• Use the sliders to adjust size, rotation, and scale</p>
+            <p>• Customize the default watermark text by adding <code className="bg-gray-800 px-2 py-1 rounded">?text=YOUR_TEXT</code> to the URL</p>
+            <p className="text-sm text-gray-400">Example: {typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}?text=SAMPLE%20ONLY` : 'https://youjing.dev/id-marking?text=SAMPLE%20ONLY'}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
