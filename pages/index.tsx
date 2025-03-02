@@ -16,8 +16,8 @@ const Home: NextPage = () => {
           <Link href="/blogs" className="underline ml-3">
             Blogs
           </Link>
-          <Link href="/id-marking" className="underline ml-3">
-            ID Marking
+          <Link href="/palang-ic" className="underline ml-3">
+            Palang IC
           </Link>
           <Link href="/" className="disabled:bg-gray-50 ml-3">
             About

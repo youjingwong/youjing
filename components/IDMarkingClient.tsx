@@ -1,4 +1,7 @@
+import { useTranslation } from 'next-i18next';
+import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
+import LanguageSwitcher from './LanguageSwitcher';
 
 interface ProcessingSettings {
   text: string;
@@ -20,13 +23,13 @@ interface DragState {
 }
 
 // Get default text from URL parameter or use fallback
-const getDefaultText = () => {
+const getDefaultText = (defaultText: string) => {
   if (typeof window !== 'undefined') {
     const urlParams = new URLSearchParams(window.location.search);
     const textParam = urlParams.get('text');
-    return textParam ? decodeURIComponent(textParam) : 'FOR PRIVATE USE ONLY';
+    return textParam ? decodeURIComponent(textParam) : defaultText;
   }
-  return 'FOR PRIVATE USE ONLY';
+  return defaultText;
 };
 
 const defaultSettings: ProcessingSettings = {
@@ -40,6 +43,8 @@ const defaultSettings: ProcessingSettings = {
 };
 
 export default function IDMarkingClient() {
+  const { t } = useTranslation('common');
+  const { locale } = useRouter();
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [frontSettings, setFrontSettings] = useState<ProcessingSettings>(defaultSettings);
@@ -58,10 +63,10 @@ export default function IDMarkingClient() {
 
   // Initialize settings with URL parameter text if available
   useEffect(() => {
-    const defaultText = getDefaultText();
+    const defaultText = getDefaultText(t('defaultWatermarkText'));
     setFrontSettings(prev => ({ ...prev, text: defaultText }));
     setBackSettings(prev => ({ ...prev, text: defaultText }));
-  }, []);
+  }, [t, locale]);
 
   const handleImageUpload = async (file: File, isFront: boolean) => {
     if (!file) return;
@@ -430,13 +435,16 @@ export default function IDMarkingClient() {
   return (
     <div className="min-h-screen bg-black text-white py-8">
       <div className="max-w-7xl mx-auto px-4">
-        <h1 className="text-3xl font-bold text-center mb-8">MyKad Cross Out & Watermark Tool</h1>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold text-center">{t('title')}</h1>
+          <LanguageSwitcher />
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Front ID Section */}
           <div>
             <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
-              <h2 className="text-xl font-semibold mb-4">Front ID</h2>
+              <h2 className="text-xl font-semibold mb-4">{t('frontID')}</h2>
               <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center">
                 <input
                   type="file"
@@ -449,7 +457,7 @@ export default function IDMarkingClient() {
                   htmlFor="front-upload"
                   className="cursor-pointer block p-4 text-gray-400 hover:text-gray-200"
                 >
-                  {frontImage ? frontImage.name : 'Upload Front ID Image'}
+                  {frontImage ? frontImage.name : t('uploadFrontID')}
                 </label>
               </div>
             </div>
@@ -457,10 +465,10 @@ export default function IDMarkingClient() {
             {frontImage && (
               <>
                 <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">Front Image Settings</h2>
+                  <h2 className="text-xl font-semibold mb-4">{t('frontImageSettings')}</h2>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Image Scale: {(frontSettings.imageScale * 100).toFixed(0)}%
+                      {t('imageScale')}: {(frontSettings.imageScale * 100).toFixed(0)}%
                     </label>
                     <input
                       type="range"
@@ -475,7 +483,7 @@ export default function IDMarkingClient() {
                 </div>
 
                 <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">Front Watermark Text</h2>
+                  <h2 className="text-xl font-semibold mb-4">{t('frontWatermarkText')}</h2>
                   <input
                     type="text"
                     value={frontSettings.text}
@@ -484,7 +492,7 @@ export default function IDMarkingClient() {
                   />
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Watermark Size: {frontSettings.textSize}px
+                      {t('watermarkSize')}: {frontSettings.textSize}px
                     </label>
                     <input
                       type="range"
@@ -496,7 +504,7 @@ export default function IDMarkingClient() {
                       className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mb-4"
                     />
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Rotation: {frontSettings.rotation}°
+                      {t('rotation')}: {frontSettings.rotation}°
                     </label>
                     <input
                       type="range"
@@ -511,7 +519,7 @@ export default function IDMarkingClient() {
                 </div>
 
                 <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">Edit Front Watermark</h2>
+                  <h2 className="text-xl font-semibold mb-4">{t('editFrontWatermark')}</h2>
                   <div className="relative">
                     <canvas
                       ref={frontEditCanvasRef}
@@ -526,7 +534,7 @@ export default function IDMarkingClient() {
                     />
                     {!frontImage && (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <p className="text-gray-400">Upload an image to edit watermark</p>
+                        <p className="text-gray-400">{t('uploadImageToEdit')}</p>
                       </div>
                     )}
                   </div>
@@ -535,7 +543,7 @@ export default function IDMarkingClient() {
                       onClick={() => frontEditCanvasRef.current && handleDownload(frontEditCanvasRef.current, 'front')}
                       className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 border border-gray-600"
                     >
-                      Download Front
+                      {t('downloadFront')}
                     </button>
                   </div>
                 </div>
@@ -546,7 +554,7 @@ export default function IDMarkingClient() {
           {/* Back ID Section */}
           <div>
             <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
-              <h2 className="text-xl font-semibold mb-4">Back ID</h2>
+              <h2 className="text-xl font-semibold mb-4">{t('backID')}</h2>
               <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center">
                 <input
                   type="file"
@@ -559,7 +567,7 @@ export default function IDMarkingClient() {
                   htmlFor="back-upload"
                   className="cursor-pointer block p-4 text-gray-400 hover:text-gray-200"
                 >
-                  {backImage ? backImage.name : 'Upload Back ID Image'}
+                  {backImage ? backImage.name : t('uploadBackID')}
                 </label>
               </div>
             </div>
@@ -567,10 +575,10 @@ export default function IDMarkingClient() {
             {backImage && (
               <>
                 <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">Back Image Settings</h2>
+                  <h2 className="text-xl font-semibold mb-4">{t('backImageSettings')}</h2>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Image Scale: {(backSettings.imageScale * 100).toFixed(0)}%
+                      {t('imageScale')}: {(backSettings.imageScale * 100).toFixed(0)}%
                     </label>
                     <input
                       type="range"
@@ -585,7 +593,7 @@ export default function IDMarkingClient() {
                 </div>
 
                 <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">Back Watermark Text</h2>
+                  <h2 className="text-xl font-semibold mb-4">{t('backWatermarkText')}</h2>
                   <input
                     type="text"
                     value={backSettings.text}
@@ -594,7 +602,7 @@ export default function IDMarkingClient() {
                   />
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Watermark Size: {backSettings.textSize}px
+                      {t('watermarkSize')}: {backSettings.textSize}px
                     </label>
                     <input
                       type="range"
@@ -606,7 +614,7 @@ export default function IDMarkingClient() {
                       className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mb-4"
                     />
                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Rotation: {backSettings.rotation}°
+                      {t('rotation')}: {backSettings.rotation}°
                     </label>
                     <input
                       type="range"
@@ -621,7 +629,7 @@ export default function IDMarkingClient() {
                 </div>
 
                 <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">Edit Back Watermark</h2>
+                  <h2 className="text-xl font-semibold mb-4">{t('editBackWatermark')}</h2>
                   <div className="relative">
                     <canvas
                       ref={backEditCanvasRef}
@@ -636,7 +644,7 @@ export default function IDMarkingClient() {
                     />
                     {!backImage && (
                       <div className="absolute inset-0 flex items-center justify-center">
-                        <p className="text-gray-400">Upload an image to edit watermark</p>
+                        <p className="text-gray-400">{t('uploadImageToEdit')}</p>
                       </div>
                     )}
                   </div>
@@ -645,7 +653,7 @@ export default function IDMarkingClient() {
                       onClick={() => backEditCanvasRef.current && handleDownload(backEditCanvasRef.current, 'back')}
                       className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 border border-gray-600"
                     >
-                      Download Back
+                      {t('downloadBack')}
                     </button>
                   </div>
                 </div>
@@ -661,19 +669,19 @@ export default function IDMarkingClient() {
               onClick={handleCombinedDownload}
               className="px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 border border-gray-600 font-semibold"
             >
-              Download Combined Image
+              {t('downloadCombined')}
             </button>
           </div>
         )}
 
         {/* Help Section */}
         <div className="mt-12 bg-gray-900 rounded-lg shadow p-6">
-          <h2 className="text-xl font-semibold mb-4">Tips</h2>
+          <h2 className="text-xl font-semibold mb-4">{t('tips')}</h2>
           <div className="text-gray-300 space-y-2">
-            <p>• Drag the watermark to position it on the image</p>
-            <p>• Use the sliders to adjust size, rotation, and scale</p>
-            <p>• Customize the default watermark text by adding <code className="bg-gray-800 px-2 py-1 rounded">?text=YOUR_TEXT</code> to the URL</p>
-            <p className="text-sm text-gray-400">Example: {typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}?text=SAMPLE%20ONLY` : 'https://youjing.dev/id-marking?text=SAMPLE%20ONLY'}</p>
+            <p>• {t('tipDrag')}</p>
+            <p>• {t('tipSliders')}</p>
+            <p>• {t('tipCustomize')} <code className="bg-gray-800 px-2 py-1 rounded">?text=YOUR_TEXT</code> {t('example')}</p>
+            <p className="text-sm text-gray-400">{t('example')}: {typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}?text=SAMPLE%20ONLY` : 'https://youjing.dev/id-marking?text=SAMPLE%20ONLY'}</p>
           </div>
         </div>
       </div>
