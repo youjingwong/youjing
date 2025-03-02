@@ -51,6 +51,8 @@ export default function IDMarkingClient() {
   const [backSettings, setBackSettings] = useState<ProcessingSettings>(defaultSettings);
   const frontEditCanvasRef = useRef<HTMLCanvasElement>(null);
   const backEditCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [isDraggingFront, setIsDraggingFront] = useState<boolean>(false);
+  const [isDraggingBack, setIsDraggingBack] = useState<boolean>(false);
   const dragStateRef = useRef<DragState>({
     isDragging: false,
     startX: 0,
@@ -432,6 +434,45 @@ export default function IDMarkingClient() {
     }
   }, [frontImage, backImage, frontSettings, backSettings]);
 
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, isFront: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isFront) {
+      setIsDraggingFront(true);
+    } else {
+      setIsDraggingBack(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>, isFront: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isFront) {
+      setIsDraggingFront(false);
+    } else {
+      setIsDraggingBack(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>, isFront: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isFront) {
+      setIsDraggingFront(false);
+    } else {
+      setIsDraggingBack(false);
+    }
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/') || file.name.endsWith('.heic') || file.name.endsWith('.heif')) {
+        await handleImageUpload(file, isFront);
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-black text-white py-8">
       <div className="max-w-7xl mx-auto px-4">
@@ -445,7 +486,12 @@ export default function IDMarkingClient() {
           <div>
             <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
               <h2 className="text-xl font-semibold mb-4">{t('frontID')}</h2>
-              <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center">
+              <div
+                className={`border-2 border-dashed ${isDraggingFront ? 'border-blue-500 bg-gray-800' : 'border-gray-700'} rounded-lg p-6 text-center transition-colors duration-200`}
+                onDragOver={(e) => handleDragOver(e, true)}
+                onDragLeave={(e) => handleDragLeave(e, true)}
+                onDrop={(e) => handleDrop(e, true)}
+              >
                 <input
                   type="file"
                   accept="image/*,.heic,.heif"
@@ -457,7 +503,7 @@ export default function IDMarkingClient() {
                   htmlFor="front-upload"
                   className="cursor-pointer block p-4 text-gray-400 hover:text-gray-200"
                 >
-                  {frontImage ? frontImage.name : t('uploadFrontID')}
+                  {frontImage ? frontImage.name : isDraggingFront ? t('dropImageHere') : t('uploadFrontID')}
                 </label>
               </div>
             </div>
@@ -555,7 +601,12 @@ export default function IDMarkingClient() {
           <div>
             <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
               <h2 className="text-xl font-semibold mb-4">{t('backID')}</h2>
-              <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center">
+              <div
+                className={`border-2 border-dashed ${isDraggingBack ? 'border-blue-500 bg-gray-800' : 'border-gray-700'} rounded-lg p-6 text-center transition-colors duration-200`}
+                onDragOver={(e) => handleDragOver(e, false)}
+                onDragLeave={(e) => handleDragLeave(e, false)}
+                onDrop={(e) => handleDrop(e, false)}
+              >
                 <input
                   type="file"
                   accept="image/*,.heic,.heif"
@@ -567,7 +618,7 @@ export default function IDMarkingClient() {
                   htmlFor="back-upload"
                   className="cursor-pointer block p-4 text-gray-400 hover:text-gray-200"
                 >
-                  {backImage ? backImage.name : t('uploadBackID')}
+                  {backImage ? backImage.name : isDraggingBack ? t('dropImageHere') : t('uploadBackID')}
                 </label>
               </div>
             </div>
@@ -678,6 +729,7 @@ export default function IDMarkingClient() {
         <div className="mt-12 bg-gray-900 rounded-lg shadow p-6">
           <h2 className="text-xl font-semibold mb-4">{t('tips')}</h2>
           <div className="text-gray-300 space-y-2">
+            <p>• {t('tipDragDrop')}</p>
             <p>• {t('tipDrag')}</p>
             <p>• {t('tipSliders')}</p>
             <p>• {t('tipCustomize')} <code className="bg-gray-800 px-2 py-1 rounded">?text=YOUR_TEXT</code> {t('example')}</p>
