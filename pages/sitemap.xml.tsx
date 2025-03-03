@@ -1,6 +1,6 @@
 import { GetServerSideProps } from 'next';
 
-const EXTERNAL_DATA_URL = 'https://youjing.vercel.app';
+const EXTERNAL_DATA_URL = 'https://youjing.dev';
 
 function generateSiteMap(pages: string[]) {
   return `<?xml version="1.0" encoding="UTF-8"?>
