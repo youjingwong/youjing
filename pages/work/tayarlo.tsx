@@ -6,9 +6,9 @@ import warehouseManagement from "../../public/work/tayarlo/warehouse_management.
 import warrantyManagement from "../../public/work/tayarlo/warranty_management.png";
 import BackToHomeLink from "../../src/data/components/BackToHomeLink";
 
-interface TayarloProps {}
+interface TayarloProps { }
 
-const Tayarlo = ({}: TayarloProps): JSX.Element => {
+const Tayarlo = ({ }: TayarloProps): React.JSX.Element => {
   return (
     <div className="container py-20">
       <h1>Tayarlo</h1>

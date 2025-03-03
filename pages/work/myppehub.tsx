@@ -4,9 +4,9 @@ import maps from "../../public/work/myppehub/maps.png";
 import requestScreen from "../../public/work/myppehub/request_screen.png";
 import BackToHomeLink from "../../src/data/components/BackToHomeLink";
 
-interface StoneAndChalkProps {}
+interface StoneAndChalkProps { }
 
-const MyPpeHub = ({}: StoneAndChalkProps): JSX.Element => {
+const MyPpeHub = ({ }: StoneAndChalkProps): React.JSX.Element => {
   return (
     <div className="container py-20">
       <h1>My Ppe Hub</h1>

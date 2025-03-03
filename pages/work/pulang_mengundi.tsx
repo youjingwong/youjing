@@ -4,9 +4,9 @@ import main from "../../public/work/pulang_mengundi/main.png";
 import subsidy from "../../public/work/pulang_mengundi/subsidy.jpeg";
 import BackToHomeLink from "../../src/data/components/BackToHomeLink";
 
-interface StoneAndChalkProps {}
+interface StoneAndChalkProps { }
 
-const PulangMengundi = ({}: StoneAndChalkProps): JSX.Element => {
+const PulangMengundi = ({ }: StoneAndChalkProps): React.JSX.Element => {
   return (
     <div className="container py-20">
       <h1>Pulang Mengundi</h1>

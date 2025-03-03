@@ -6,9 +6,9 @@ import nutritionalSummary from "../../public/work/smithkit/nutritional_summary.p
 import recipeManagement from "../../public/work/smithkit/recipe_management.png";
 import BackToHomeLink from "../../src/data/components/BackToHomeLink";
 
-interface SmithKitProps {}
+interface SmithKitProps { }
 
-const SmithKit = ({}: SmithKitProps): JSX.Element => {
+const SmithKit = ({ }: SmithKitProps): React.JSX.Element => {
   return (
     <div className="container py-20">
       <h1>Smithkit</h1>

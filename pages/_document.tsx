@@ -96,6 +96,8 @@ class MyDocument extends Document {
             sizes="16x16"
             href="/favicon-16x16.png"
           />
+          <title key="title">You Jing Wong</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1" key="viewport" />
           <link rel="manifest" href="/manifest.json" />
           <meta name="msapplication-TileColor" content="#ffffff" />
           <meta name="msapplication-TileImage" content="/ms-icon-144x144.png" />

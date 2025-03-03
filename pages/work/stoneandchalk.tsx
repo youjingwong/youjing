@@ -5,9 +5,9 @@ import customSidebar from "../../public/work/stoneandchalk/custom_sidebar.png";
 import landingPage from "../../public/work/stoneandchalk/home_page.png";
 import BackToHomeLink from "../../src/data/components/BackToHomeLink";
 
-interface StoneAndChalkProps {}
+interface StoneAndChalkProps { }
 
-const StoneAndChalk = ({}: StoneAndChalkProps): JSX.Element => {
+const StoneAndChalk = ({ }: StoneAndChalkProps): React.JSX.Element => {
   return (
     <div className="container py-20">
       <h1>Stone & Chalk</h1>

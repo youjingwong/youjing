@@ -1,12 +1,11 @@
 import Image from "next/image";
-import React from "react";
 import home from "../../public/work/bountysource/home.png";
 import salt from "../../public/work/bountysource/salt.png";
 import BackToHomeLink from "../../src/data/components/BackToHomeLink";
 
-interface StoneAndChalkProps {}
+interface StoneAndChalkProps { }
 
-const Bountysource = ({}: StoneAndChalkProps): JSX.Element => {
+const Bountysource = ({ }: StoneAndChalkProps): React.JSX.Element => {
   return (
     <div className="container py-20">
       <h1>Bountysource</h1>
