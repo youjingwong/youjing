@@ -1,9 +1,19 @@
 import type { NextPage } from "next";
 import Head from "next/head";
 import Link from "next/link";
+import * as gtag from "../lib/gtag";
 import { workSummaries } from "../src/data/work_summaries";
 
 const Home: NextPage = () => {
+  // Example function to track a link click
+  const handleLinkClick = (linkName: string) => {
+    gtag.event({
+      action: "click",
+      category: "engagement",
+      label: `${linkName}_link_click`,
+    });
+  };
+
   return (
     <>
       <Head>
@@ -13,10 +23,10 @@ const Home: NextPage = () => {
         <h1>You Jing</h1>
 
         <div className="text-right">
-          <Link href="/blogs" className="underline ml-3">
+          <Link href="/blogs" className="underline ml-3" onClick={() => handleLinkClick("blogs")}>
             Blogs
           </Link>
-          <Link href="/palang-ic" className="underline ml-3">
+          <Link href="/palang-ic" className="underline ml-3" onClick={() => handleLinkClick("palang_ic")}>
             Palang IC
           </Link>
           <Link href="/" className="disabled:bg-gray-50 ml-3">
