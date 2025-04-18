@@ -107,6 +107,9 @@ const Home: NextPage = () => {
             g@youjing.dev
           </a>
         </div>
+        <div className="mt-6 text-sm text-gray-500">
+          &copy; {new Date().getFullYear()} CRUD LABS SDN BHD 202201017980 (1463677-U)
+        </div>
       </div>
     </>
   );
