@@ -10,6 +10,7 @@
   "imageScale": "图片比例",
   "frontWatermarkText": "正面水印文字",
   "backWatermarkText": "背面水印文字",
+  "watermarkColor": "水印颜色",
   "watermarkSize": "水印大小",
   "rotation": "旋转角度",
   "editFrontWatermark": "编辑正面水印",

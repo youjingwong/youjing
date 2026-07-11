@@ -10,6 +10,7 @@
   "imageScale": "Skala Imej",
   "frontWatermarkText": "Teks Tanda Air Hadapan",
   "backWatermarkText": "Teks Tanda Air Belakang",
+  "watermarkColor": "Warna Tanda Air",
   "watermarkSize": "Saiz Tanda Air",
   "rotation": "Putaran",
   "editFrontWatermark": "Edit Tanda Air Hadapan",

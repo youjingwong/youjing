@@ -10,6 +10,7 @@
   "imageScale": "Image Scale",
   "frontWatermarkText": "Front Watermark Text",
   "backWatermarkText": "Back Watermark Text",
+  "watermarkColor": "Watermark Color",
   "watermarkSize": "Watermark Size",
   "rotation": "Rotation",
   "editFrontWatermark": "Edit Front Watermark",

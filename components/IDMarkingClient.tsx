@@ -5,6 +5,7 @@ import LanguageSwitcher from './LanguageSwitcher';
 
 interface ProcessingSettings {
   text: string;
+  color: string;
   lineWidth: number;
   textSize: number;
   rotation: number;
@@ -34,6 +35,7 @@ const getDefaultText = (defaultText: string) => {
 
 const defaultSettings: ProcessingSettings = {
   text: 'FOR PRIVATE USE ONLY', // This will be overridden in useEffect
+  color: '#000000',
   lineWidth: 5,
   textSize: 48,
   rotation: -45,
@@ -382,7 +384,7 @@ export default function IDMarkingClient() {
     // Draw lines
     ctx.beginPath();
     ctx.lineWidth = settings.lineWidth;
-    ctx.strokeStyle = 'black';
+    ctx.strokeStyle = settings.color;
 
     // First line (top)
     ctx.moveTo(lineStart, -lineSpacing);
@@ -395,7 +397,7 @@ export default function IDMarkingClient() {
     ctx.stroke();
 
     // Draw text
-    ctx.fillStyle = 'black';
+    ctx.fillStyle = settings.color;
     ctx.fillText(settings.text, 0, 0);
 
     // Restore context state
@@ -537,6 +539,16 @@ export default function IDMarkingClient() {
                     className="block w-full rounded-md border-gray-600 bg-gray-800 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 mb-4"
                   />
                   <div>
+                    <label htmlFor="front-watermark-color" className="block text-sm font-medium text-gray-300 mb-2">
+                      {t('watermarkColor')}: {frontSettings.color.toUpperCase()}
+                    </label>
+                    <input
+                      id="front-watermark-color"
+                      type="color"
+                      value={frontSettings.color}
+                      onChange={(e) => setFrontSettings({ ...frontSettings, color: e.target.value })}
+                      className="block w-full h-10 rounded-md border border-gray-600 bg-gray-800 p-1 cursor-pointer mb-4"
+                    />
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       {t('watermarkSize')}: {frontSettings.textSize}px
                     </label>
@@ -652,6 +664,16 @@ export default function IDMarkingClient() {
                     className="block w-full rounded-md border-gray-600 bg-gray-800 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 mb-4"
                   />
                   <div>
+                    <label htmlFor="back-watermark-color" className="block text-sm font-medium text-gray-300 mb-2">
+                      {t('watermarkColor')}: {backSettings.color.toUpperCase()}
+                    </label>
+                    <input
+                      id="back-watermark-color"
+                      type="color"
+                      value={backSettings.color}
+                      onChange={(e) => setBackSettings({ ...backSettings, color: e.target.value })}
+                      className="block w-full h-10 rounded-md border border-gray-600 bg-gray-800 p-1 cursor-pointer mb-4"
+                    />
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       {t('watermarkSize')}: {backSettings.textSize}px
                     </label>
@@ -739,4 +761,4 @@ export default function IDMarkingClient() {
       </div>
     </div>
   );
-} 
+}
