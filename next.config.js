@@ -4,6 +4,9 @@ const { i18n } = require('./next-i18next.config');
 module.exports = {
   reactStrictMode: true,
   i18n,
+  turbopack: {
+    root: __dirname,
+  },
   async redirects() {
     return [
       {
@@ -13,8 +16,6 @@ module.exports = {
       },
     ];
   },
-  // Enable generating static files
-  output: 'standalone',
   // Configure headers to ensure sitemap is accessible
   async headers() {
     return [

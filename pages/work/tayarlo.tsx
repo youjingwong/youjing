@@ -60,7 +60,7 @@ const Tayarlo = ({ }: TayarloProps): React.JSX.Element => {
             alt="lading-page"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
         <div className="mt-3">
@@ -70,7 +70,7 @@ const Tayarlo = ({ }: TayarloProps): React.JSX.Element => {
             alt="warranty-management"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
         <div className="mt-3">
@@ -80,7 +80,7 @@ const Tayarlo = ({ }: TayarloProps): React.JSX.Element => {
             alt="warehouse-management"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
         <div className="mt-3">
@@ -90,7 +90,7 @@ const Tayarlo = ({ }: TayarloProps): React.JSX.Element => {
             alt="fleet-tracking"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
       </div>

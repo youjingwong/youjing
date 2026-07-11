@@ -54,7 +54,7 @@ const PulangMengundi = ({ }: StoneAndChalkProps): React.JSX.Element => {
             alt="main"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
         <div className="mt-3">
@@ -64,7 +64,7 @@ const PulangMengundi = ({ }: StoneAndChalkProps): React.JSX.Element => {
             alt="subsidy"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
       </div>

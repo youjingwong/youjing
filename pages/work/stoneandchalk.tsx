@@ -39,7 +39,7 @@ const StoneAndChalk = ({ }: StoneAndChalkProps): React.JSX.Element => {
             alt="landing-page"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
         <div className="mt-3">
@@ -48,7 +48,7 @@ const StoneAndChalk = ({ }: StoneAndChalkProps): React.JSX.Element => {
             alt="custom-sidebar"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
         <div className="mt-3">
@@ -58,7 +58,7 @@ const StoneAndChalk = ({ }: StoneAndChalkProps): React.JSX.Element => {
             alt="event-calendar"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
       </div>

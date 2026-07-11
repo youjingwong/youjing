@@ -1,4 +1,4 @@
-import { useTranslation } from 'next-i18next';
+import { useTranslation } from 'next-i18next/pages';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -28,13 +28,21 @@ const getDefaultText = (defaultText: string) => {
   if (typeof window !== 'undefined') {
     const urlParams = new URLSearchParams(window.location.search);
     const textParam = urlParams.get('text');
-    return textParam ? decodeURIComponent(textParam) : defaultText;
+    return textParam || defaultText;
   }
   return defaultText;
 };
 
+const isHeicImage = (file: File) =>
+  file.type === 'image/heic' ||
+  file.type === 'image/heif' ||
+  /\.(heic|heif)$/i.test(file.name);
+
+const isSupportedImage = (file: File) =>
+  file.type.startsWith('image/') || isHeicImage(file);
+
 const defaultSettings: ProcessingSettings = {
-  text: 'FOR PRIVATE USE ONLY', // This will be overridden in useEffect
+  text: 'FOR PRIVATE USE ONLY',
   color: '#000000',
   lineWidth: 5,
   textSize: 48,
@@ -45,12 +53,19 @@ const defaultSettings: ProcessingSettings = {
 };
 
 export default function IDMarkingClient() {
-  const { t } = useTranslation('common');
-  const { locale } = useRouter();
+  const { t, i18n } = useTranslation('common');
+  const router = useRouter();
+  const initialWatermarkText = getDefaultText(t('defaultWatermarkText'));
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
-  const [frontSettings, setFrontSettings] = useState<ProcessingSettings>(defaultSettings);
-  const [backSettings, setBackSettings] = useState<ProcessingSettings>(defaultSettings);
+  const [frontSettings, setFrontSettings] = useState<ProcessingSettings>(() => ({
+    ...defaultSettings,
+    text: initialWatermarkText,
+  }));
+  const [backSettings, setBackSettings] = useState<ProcessingSettings>(() => ({
+    ...defaultSettings,
+    text: initialWatermarkText,
+  }));
   const frontEditCanvasRef = useRef<HTMLCanvasElement>(null);
   const backEditCanvasRef = useRef<HTMLCanvasElement>(null);
   const [isDraggingFront, setIsDraggingFront] = useState<boolean>(false);
@@ -65,19 +80,28 @@ export default function IDMarkingClient() {
   });
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
-  // Initialize settings with URL parameter text if available
   useEffect(() => {
-    const defaultText = getDefaultText(t('defaultWatermarkText'));
-    setFrontSettings(prev => ({ ...prev, text: defaultText }));
-    setBackSettings(prev => ({ ...prev, text: defaultText }));
-  }, [t, locale]);
+    const syncLocalizedWatermarkText = () => {
+      const locale = router.locale || 'en';
+      const localizedText = i18n.getFixedT(locale, 'common')('defaultWatermarkText');
+      const defaultText = getDefaultText(localizedText);
+
+      setFrontSettings(prev => ({ ...prev, text: defaultText }));
+      setBackSettings(prev => ({ ...prev, text: defaultText }));
+    };
+
+    router.events.on('routeChangeComplete', syncLocalizedWatermarkText);
+    return () => {
+      router.events.off('routeChangeComplete', syncLocalizedWatermarkText);
+    };
+  }, [i18n, router]);
 
   const handleImageUpload = async (file: File, isFront: boolean) => {
-    if (!file) return;
+    if (!file || !isSupportedImage(file)) return;
 
     let imageFile = file;
     // Convert HEIC to JPEG if needed
-    if (file.type === 'image/heic' || file.type === 'image/heif') {
+    if (isHeicImage(file)) {
       try {
         const heic2any = (await import('heic2any')).default;
         const blob = await heic2any({
@@ -469,7 +493,7 @@ export default function IDMarkingClient() {
     const files = e.dataTransfer.files;
     if (files && files.length > 0) {
       const file = files[0];
-      if (file.type.startsWith('image/') || file.name.endsWith('.heic') || file.name.endsWith('.heif')) {
+      if (isSupportedImage(file)) {
         await handleImageUpload(file, isFront);
       }
     }
@@ -478,15 +502,15 @@ export default function IDMarkingClient() {
   return (
     <div className="min-h-screen bg-black text-white py-8">
       <div className="max-w-7xl mx-auto px-4">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-center">{t('title')}</h1>
+        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center mb-8">
+          <h1 className="text-3xl font-bold text-center sm:text-left">{t('title')}</h1>
           <LanguageSwitcher />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Front ID Section */}
           <div>
-            <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
+            <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
               <h2 className="text-xl font-semibold mb-4">{t('frontID')}</h2>
               <div
                 className={`border-2 border-dashed ${isDraggingFront ? 'border-blue-500 bg-gray-800' : 'border-gray-700'} rounded-lg p-6 text-center transition-colors duration-200`}
@@ -512,7 +536,7 @@ export default function IDMarkingClient() {
 
             {frontImage && (
               <>
-                <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
+                <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <h2 className="text-xl font-semibold mb-4">{t('frontImageSettings')}</h2>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -530,13 +554,13 @@ export default function IDMarkingClient() {
                   </div>
                 </div>
 
-                <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
+                <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <h2 className="text-xl font-semibold mb-4">{t('frontWatermarkText')}</h2>
                   <input
                     type="text"
                     value={frontSettings.text}
                     onChange={(e) => setFrontSettings({ ...frontSettings, text: e.target.value })}
-                    className="block w-full rounded-md border-gray-600 bg-gray-800 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 mb-4"
+                    className="block w-full rounded-md border-gray-600 bg-gray-800 text-white shadow-xs focus:border-blue-500 focus:ring-blue-500 mb-4"
                   />
                   <div>
                     <label htmlFor="front-watermark-color" className="block text-sm font-medium text-gray-300 mb-2">
@@ -576,7 +600,7 @@ export default function IDMarkingClient() {
                   </div>
                 </div>
 
-                <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
+                <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <h2 className="text-xl font-semibold mb-4">{t('editFrontWatermark')}</h2>
                   <div className="relative">
                     <canvas
@@ -599,7 +623,7 @@ export default function IDMarkingClient() {
                   <div className="flex justify-center mt-4">
                     <button
                       onClick={() => frontEditCanvasRef.current && handleDownload(frontEditCanvasRef.current, 'front')}
-                      className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 border border-gray-600"
+                      className="px-4 py-2 bg-gray-800 text-white rounded-sm hover:bg-gray-700 border border-gray-600"
                     >
                       {t('downloadFront')}
                     </button>
@@ -611,7 +635,7 @@ export default function IDMarkingClient() {
 
           {/* Back ID Section */}
           <div>
-            <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
+            <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
               <h2 className="text-xl font-semibold mb-4">{t('backID')}</h2>
               <div
                 className={`border-2 border-dashed ${isDraggingBack ? 'border-blue-500 bg-gray-800' : 'border-gray-700'} rounded-lg p-6 text-center transition-colors duration-200`}
@@ -637,7 +661,7 @@ export default function IDMarkingClient() {
 
             {backImage && (
               <>
-                <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
+                <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <h2 className="text-xl font-semibold mb-4">{t('backImageSettings')}</h2>
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -655,13 +679,13 @@ export default function IDMarkingClient() {
                   </div>
                 </div>
 
-                <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
+                <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <h2 className="text-xl font-semibold mb-4">{t('backWatermarkText')}</h2>
                   <input
                     type="text"
                     value={backSettings.text}
                     onChange={(e) => setBackSettings({ ...backSettings, text: e.target.value })}
-                    className="block w-full rounded-md border-gray-600 bg-gray-800 text-white shadow-sm focus:border-blue-500 focus:ring-blue-500 mb-4"
+                    className="block w-full rounded-md border-gray-600 bg-gray-800 text-white shadow-xs focus:border-blue-500 focus:ring-blue-500 mb-4"
                   />
                   <div>
                     <label htmlFor="back-watermark-color" className="block text-sm font-medium text-gray-300 mb-2">
@@ -701,7 +725,7 @@ export default function IDMarkingClient() {
                   </div>
                 </div>
 
-                <div className="bg-gray-900 rounded-lg shadow p-6 mb-8">
+                <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <h2 className="text-xl font-semibold mb-4">{t('editBackWatermark')}</h2>
                   <div className="relative">
                     <canvas
@@ -724,7 +748,7 @@ export default function IDMarkingClient() {
                   <div className="flex justify-center mt-4">
                     <button
                       onClick={() => backEditCanvasRef.current && handleDownload(backEditCanvasRef.current, 'back')}
-                      className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 border border-gray-600"
+                      className="px-4 py-2 bg-gray-800 text-white rounded-sm hover:bg-gray-700 border border-gray-600"
                     >
                       {t('downloadBack')}
                     </button>
@@ -748,13 +772,13 @@ export default function IDMarkingClient() {
         )}
 
         {/* Help Section */}
-        <div className="mt-12 bg-gray-900 rounded-lg shadow p-6">
+        <div className="mt-12 bg-gray-900 rounded-lg shadow-sm p-6">
           <h2 className="text-xl font-semibold mb-4">{t('tips')}</h2>
           <div className="text-gray-300 space-y-2">
             <p>• {t('tipDragDrop')}</p>
             <p>• {t('tipDrag')}</p>
             <p>• {t('tipSliders')}</p>
-            <p>• {t('tipCustomize')} <code className="bg-gray-800 px-2 py-1 rounded">?text=YOUR_TEXT</code> {t('example')}</p>
+            <p>• {t('tipCustomize')} <code className="bg-gray-800 px-2 py-1 rounded-sm">?text=YOUR_TEXT</code> {t('example')}</p>
             <p className="text-sm text-gray-400">{t('example')}: {typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}?text=SAMPLE%20ONLY` : 'https://youjing.dev/id-marking?text=SAMPLE%20ONLY'}</p>
           </div>
         </div>

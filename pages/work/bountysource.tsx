@@ -37,7 +37,7 @@ const Bountysource = ({ }: StoneAndChalkProps): React.JSX.Element => {
             alt="home"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
         <div className="mt-3">
@@ -46,7 +46,7 @@ const Bountysource = ({ }: StoneAndChalkProps): React.JSX.Element => {
             alt="salt"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
       </div>

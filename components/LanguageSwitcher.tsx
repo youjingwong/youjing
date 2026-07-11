@@ -1,4 +1,4 @@
-import { useTranslation } from 'next-i18next';
+import { useTranslation } from 'next-i18next/pages';
 import { useRouter } from 'next/router';
 
 export default function LanguageSwitcher() {
@@ -11,29 +11,29 @@ export default function LanguageSwitcher() {
   };
 
   return (
-    <div className="flex items-center space-x-2 text-sm flex-wrap">
+    <div className="flex items-center justify-center sm:justify-start gap-x-2 text-sm flex-wrap">
       <span className="text-gray-400">{t('language')}:</span>
       <button
         onClick={() => changeLanguage('en')}
-        className={`px-2 py-1 rounded ${locale === 'en' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+        className={`px-2 py-1 rounded-sm ${locale === 'en' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
           }`}
       >
         English
       </button>
       <button
         onClick={() => changeLanguage('ms')}
-        className={`px-2 py-1 rounded ${locale === 'ms' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+        className={`px-2 py-1 rounded-sm ${locale === 'ms' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
           }`}
       >
         Bahasa Melayu
       </button>
       <button
         onClick={() => changeLanguage('zh')}
-        className={`px-2 py-1 rounded ${locale === 'zh' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+        className={`px-2 py-1 rounded-sm ${locale === 'zh' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
           }`}
       >
         中文
       </button>
     </div>
   );
-} 
+}

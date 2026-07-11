@@ -41,7 +41,7 @@ const SmithKit = ({ }: SmithKitProps): React.JSX.Element => {
             alt="landing-page"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
         <div className="mt-3">
@@ -51,7 +51,7 @@ const SmithKit = ({ }: SmithKitProps): React.JSX.Element => {
             alt="meal-planning"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
 
@@ -62,7 +62,7 @@ const SmithKit = ({ }: SmithKitProps): React.JSX.Element => {
             alt="recipe-management"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
 
@@ -73,7 +73,7 @@ const SmithKit = ({ }: SmithKitProps): React.JSX.Element => {
             alt="nutritional-summary"
             placeholder="blur"
             sizes="(min-width: 1024px) 1024px, 100vw"
-            layout="responsive"
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
       </div>

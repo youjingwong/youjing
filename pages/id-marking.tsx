@@ -1,7 +1,8 @@
 import { GetStaticProps } from 'next';
-import { useTranslation } from 'next-i18next';
-import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
-import { NextSeo } from 'next-seo';
+import Head from 'next/head';
+import { useTranslation } from 'next-i18next/pages';
+import { serverSideTranslations } from 'next-i18next/pages/serverSideTranslations';
+import { generateNextSeo, type NextSeoProps } from 'next-seo/pages';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 
@@ -22,7 +23,7 @@ const IDMarking = () => {
   const { t } = useTranslation('common');
   const { locale } = useRouter();
 
-  const SEO = {
+  const SEO: NextSeoProps = {
     title: `${t('title')} | Palang IC`,
     description: locale === 'ms'
       ? 'Palang dan tambah tanda air pada imej MyKad Malaysia. Alat mudah untuk MyKad, IC, dan dokumen pengenalan. Palang IC dengan mudah.'
@@ -66,12 +67,6 @@ const IDMarking = () => {
       {
         name: 'application-name',
         content: `${t('title')}`
-      },
-      {
-        name: 'description',
-        content: locale === 'ms'
-          ? 'Palang dan tambah tanda air pada imej MyKad Malaysia. Mudah, selamat, dan senang digunakan. Tiada pendaftaran diperlukan.'
-          : 'Cross out and watermark Malaysian IC/MyKad images. Simple, secure, and easy to use. No registration required.'
       }
     ],
     additionalLinkTags: [
@@ -107,7 +102,7 @@ const IDMarking = () => {
 
   return (
     <>
-      <NextSeo {...SEO} />
+      <Head>{generateNextSeo(SEO)}</Head>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -117,4 +112,4 @@ const IDMarking = () => {
   );
 };
 
-export default IDMarking; 
+export default IDMarking;

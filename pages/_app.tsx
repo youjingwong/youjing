@@ -1,5 +1,6 @@
-import { appWithTranslation } from "next-i18next";
+import { appWithTranslation } from "next-i18next/pages";
 import type { AppProps } from "next/app";
+import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 import * as gtag from "../lib/gtag";
@@ -21,9 +22,14 @@ function MyApp({ Component, pageProps }: AppProps) {
   }, [router.events]);
 
   return (
-    <div>
-      <Component {...pageProps} />
-    </div>
+    <>
+      <Head>
+        <title>You Jing Wong</title>
+      </Head>
+      <div>
+        <Component {...pageProps} />
+      </div>
+    </>
   );
 }
 

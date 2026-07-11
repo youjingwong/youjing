@@ -17,7 +17,7 @@ const Home: NextPage = () => {
   return (
     <>
       <Head>
-        <title>Blogs</title>
+        <title>You Jing Wong</title>
       </Head>
       <div className="container py-20">
         <h1>You Jing</h1>
@@ -54,7 +54,7 @@ const Home: NextPage = () => {
           limited to two sided platforms, meal planning, warehouse management
           systems, and call center systems.
         </p>
-        <hr className="my-8"></hr>
+        <hr className="my-8 border-gray-200"></hr>
         <h2 className="mt-4 ">Work</h2>
 
         {workSummaries.map((workSummary, index) => {
@@ -69,7 +69,7 @@ const Home: NextPage = () => {
             </div>
           );
         })}
-        <hr className="my-10"></hr>
+        <hr className="my-10 border-gray-200"></hr>
         <div>
           <a
             href="https://www.linkedin.com/in/you-jing-wong/"
