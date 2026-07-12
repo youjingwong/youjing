@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   clampImageScale,
-  createIdlePinchGestureState,
   DEFAULT_IMAGE_SCALE,
   endPinchGesture,
   IMAGE_SCALE_STEP,
@@ -29,13 +28,20 @@ import {
 } from '../lib/imageRotation';
 import {
   createIdleWatermarkDragState,
+  endWatermarkTransform,
   getPointInRotatedSpace,
   isPointInWatermarkBounds,
   moveWatermarkDrag,
+  shouldStartWatermarkTransform,
   startWatermarkDrag,
+  startWatermarkTransform,
+  updateWatermarkTransform,
+  MAX_WATERMARK_TEXT_SIZE,
+  MIN_WATERMARK_TEXT_SIZE,
   type WatermarkDragInput,
   type WatermarkDragSide,
   type WatermarkDragState,
+  type WatermarkTransformState,
 } from '../lib/watermarkHitTest';
 import LanguageSwitcher from './LanguageSwitcher';
 
@@ -57,6 +63,11 @@ interface CanvasTouchHandlers {
   end: (event: TouchEvent) => void;
   cancel: () => void;
 }
+
+type MultiTouchGesture =
+  | { kind: 'idle' }
+  | { kind: 'image'; state: PinchGestureState }
+  | { kind: 'watermark'; state: WatermarkTransformState };
 
 // Get default text from URL parameter or use fallback
 const getDefaultText = (defaultText: string) => {
@@ -307,7 +318,7 @@ export default function IDMarkingClient() {
   const [isProcessingFront, setIsProcessingFront] = useState<boolean>(false);
   const [isProcessingBack, setIsProcessingBack] = useState<boolean>(false);
   const dragStateRef = useRef<WatermarkDragState>(createIdleWatermarkDragState());
-  const pinchStateRef = useRef<PinchGestureState>(createIdlePinchGestureState());
+  const multiTouchGestureRef = useRef<MultiTouchGesture>({ kind: 'idle' });
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
   useEffect(() => {
@@ -351,11 +362,11 @@ export default function IDMarkingClient() {
     dragStateRef.current = createIdleWatermarkDragState();
   };
 
-  const resetPinchState = () => {
-    pinchStateRef.current = createIdlePinchGestureState();
+  const resetMultiTouchGesture = () => {
+    multiTouchGestureRef.current = { kind: 'idle' };
   };
 
-  const beginPinch = (
+  const beginImagePinch = (
     touches: TouchList,
     isFront: boolean,
     startScale: number
@@ -363,11 +374,48 @@ export default function IDMarkingClient() {
     if (touches.length < 2) return false;
 
     const side: PinchSide = isFront ? 'front' : 'back';
-    pinchStateRef.current = startPinchGesture(
-      getPinchTouches(touches),
-      side,
-      startScale
-    );
+    multiTouchGestureRef.current = {
+      kind: 'image',
+      state: startPinchGesture(getPinchTouches(touches), side, startScale),
+    };
+
+    return true;
+  };
+
+  const beginWatermarkTransform = (
+    touches: TouchList,
+    isFront: boolean,
+    textSize: number,
+    rotation: number,
+    preferredTouchIdentifier: number | null = null
+  ) => {
+    if (touches.length < 2) return false;
+
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+    const transformTouches = getPinchTouches(touches);
+    const preferredTouch = preferredTouchIdentifier === null
+      ? null
+      : transformTouches.find(
+          touch => touch.identifier === preferredTouchIdentifier
+        );
+    const orderedTouches = preferredTouch
+      ? [
+          preferredTouch,
+          ...transformTouches.filter(
+            touch => touch.identifier !== preferredTouchIdentifier
+          ),
+        ]
+      : transformTouches;
+
+    multiTouchGestureRef.current = {
+      kind: 'watermark',
+      state: startWatermarkTransform(
+        orderedTouches,
+        side,
+        textSize,
+        rotation
+      ),
+    };
 
     return true;
   };
@@ -376,7 +424,7 @@ export default function IDMarkingClient() {
     if (!file || !isSupportedImage(file)) return;
 
     resetDragState();
-    resetPinchState();
+    resetMultiTouchGesture();
 
     const uploadGenerationRef = isFront ? frontUploadGenerationRef : backUploadGenerationRef;
     const setIsProcessing = isFront ? setIsProcessingFront : setIsProcessingBack;
@@ -445,7 +493,7 @@ export default function IDMarkingClient() {
     setIsProcessingBack(false);
     setDebugInfo([]);
     resetDragState();
-    resetPinchState();
+    resetMultiTouchGesture();
     setFrontSettings(prev => ({
       ...prev,
       imageScale: DEFAULT_IMAGE_SCALE,
@@ -675,22 +723,50 @@ export default function IDMarkingClient() {
     e: TouchEvent,
     isFront: boolean
   ) => {
-    const side: PinchSide = isFront ? 'front' : 'back';
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+    const activeGesture = multiTouchGestureRef.current;
 
-    if (e.targetTouches.length >= 2) {
-      e.preventDefault();
-      const settings = isFront ? frontSettings : backSettings;
-      const activePinch = pinchStateRef.current;
-      const startScale = activePinch.isPinching && activePinch.side === side
-        ? activePinch.currentScale
-        : settings.imageScale;
-
-      resetDragState();
-      beginPinch(e.targetTouches, isFront, startScale);
+    if (
+      activeGesture.kind !== 'idle' &&
+      activeGesture.state.side !== side
+    ) {
       return;
     }
 
-    resetPinchState();
+    if (e.targetTouches.length >= 2) {
+      if (activeGesture.kind !== 'idle') {
+        e.preventDefault();
+        return;
+      }
+
+      const settings = isFront ? frontSettings : backSettings;
+      const activeTouchIdentifiers = getPinchTouches(e.targetTouches).map(
+        touch => touch.identifier
+      );
+      const shouldTransformWatermark = shouldStartWatermarkTransform(
+        dragStateRef.current,
+        side,
+        activeTouchIdentifiers
+      );
+      const initiatingTouchIdentifier = dragStateRef.current.touchIdentifier;
+
+      e.preventDefault();
+      resetDragState();
+      if (shouldTransformWatermark) {
+        beginWatermarkTransform(
+          e.targetTouches,
+          isFront,
+          settings.textSize,
+          settings.rotation,
+          initiatingTouchIdentifier
+        );
+      } else {
+        beginImagePinch(e.targetTouches, isFront, settings.imageScale);
+      }
+      return;
+    }
+
+    resetMultiTouchGesture();
     handleStart(e, isFront);
   };
 
@@ -698,18 +774,52 @@ export default function IDMarkingClient() {
     e: TouchEvent,
     isFront: boolean
   ) => {
-    const pinchState = pinchStateRef.current;
-    const side: PinchSide = isFront ? 'front' : 'back';
+    const activeGesture = multiTouchGestureRef.current;
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
 
-    if (pinchState.isPinching && pinchState.side === side) {
+    if (
+      activeGesture.kind === 'watermark' &&
+      activeGesture.state.side === side
+    ) {
       e.preventDefault();
-
-      const pinchUpdate = updatePinchGesture(
-        pinchState,
+      const transformUpdate = updateWatermarkTransform(
+        activeGesture.state,
         getPinchTouches(e.targetTouches),
         side
       );
-      pinchStateRef.current = pinchUpdate.state;
+      multiTouchGestureRef.current = {
+        kind: 'watermark',
+        state: transformUpdate.state,
+      };
+
+      if (
+        transformUpdate.textSize !== null &&
+        transformUpdate.rotation !== null
+      ) {
+        const textSize = transformUpdate.textSize;
+        const rotation = transformUpdate.rotation;
+        const setSettings = isFront ? setFrontSettings : setBackSettings;
+        setSettings(prev => ({
+          ...prev,
+          textSize,
+          rotation,
+        }));
+      }
+      return;
+    }
+
+    if (activeGesture.kind === 'image' && activeGesture.state.side === side) {
+      e.preventDefault();
+
+      const pinchUpdate = updatePinchGesture(
+        activeGesture.state,
+        getPinchTouches(e.targetTouches),
+        side
+      );
+      multiTouchGestureRef.current = {
+        kind: 'image',
+        state: pinchUpdate.state,
+      };
       const imageScale = pinchUpdate.imageScale;
 
       if (imageScale !== null) {
@@ -721,11 +831,33 @@ export default function IDMarkingClient() {
       return;
     }
 
+    if (activeGesture.kind !== 'idle') return;
+
     if (e.targetTouches.length >= 2) {
       e.preventDefault();
       const settings = isFront ? frontSettings : backSettings;
+      const activeTouchIdentifiers = getPinchTouches(e.targetTouches).map(
+        touch => touch.identifier
+      );
+      const shouldTransformWatermark = shouldStartWatermarkTransform(
+        dragStateRef.current,
+        side,
+        activeTouchIdentifiers
+      );
+      const initiatingTouchIdentifier = dragStateRef.current.touchIdentifier;
+
       resetDragState();
-      beginPinch(e.targetTouches, isFront, settings.imageScale);
+      if (shouldTransformWatermark) {
+        beginWatermarkTransform(
+          e.targetTouches,
+          isFront,
+          settings.textSize,
+          settings.rotation,
+          initiatingTouchIdentifier
+        );
+      } else {
+        beginImagePinch(e.targetTouches, isFront, settings.imageScale);
+      }
       return;
     }
 
@@ -738,25 +870,56 @@ export default function IDMarkingClient() {
     e: TouchEvent,
     isFront: boolean
   ) => {
-    const pinchState = pinchStateRef.current;
-    const side: PinchSide = isFront ? 'front' : 'back';
+    const activeGesture = multiTouchGestureRef.current;
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
 
-    if (pinchState.isPinching && pinchState.side === side) {
-      pinchStateRef.current = endPinchGesture(
-        pinchState,
+    if (
+      activeGesture.kind === 'watermark' &&
+      activeGesture.state.side === side
+    ) {
+      const nextState = endWatermarkTransform(
+        activeGesture.state,
         getPinchTouches(e.targetTouches),
         side
       );
+      multiTouchGestureRef.current = nextState.isTransforming
+        ? { kind: 'watermark', state: nextState }
+        : { kind: 'idle' };
       resetDragState();
       return;
     }
 
-    resetPinchState();
+    if (activeGesture.kind === 'image' && activeGesture.state.side === side) {
+      const nextState = endPinchGesture(
+        activeGesture.state,
+        getPinchTouches(e.targetTouches),
+        side
+      );
+      multiTouchGestureRef.current = nextState.isPinching
+        ? { kind: 'image', state: nextState }
+        : { kind: 'idle' };
+      resetDragState();
+      return;
+    }
+
+    if (activeGesture.kind !== 'idle') return;
+
+    resetMultiTouchGesture();
     resetDragState();
   };
 
-  const handleTouchCancel = () => {
-    resetPinchState();
+  const handleTouchCancel = (isFront: boolean) => {
+    const activeGesture = multiTouchGestureRef.current;
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+
+    if (
+      activeGesture.kind !== 'idle' &&
+      activeGesture.state.side !== side
+    ) {
+      return;
+    }
+
+    resetMultiTouchGesture();
     resetDragState();
   };
 
@@ -765,13 +928,13 @@ export default function IDMarkingClient() {
       start: event => handleTouchStart(event, true),
       move: event => handleTouchMove(event, true),
       end: event => handleTouchEnd(event, true),
-      cancel: handleTouchCancel,
+      cancel: () => handleTouchCancel(true),
     };
     backTouchHandlersRef.current = {
       start: event => handleTouchStart(event, false),
       move: event => handleTouchMove(event, false),
       end: event => handleTouchEnd(event, false),
-      cancel: handleTouchCancel,
+      cancel: () => handleTouchCancel(false),
     };
   });
 
@@ -1082,8 +1245,8 @@ export default function IDMarkingClient() {
                     </label>
                     <input
                       type="range"
-                      min="12"
-                      max="200"
+                      min={MIN_WATERMARK_TEXT_SIZE}
+                      max={MAX_WATERMARK_TEXT_SIZE}
                       step="1"
                       value={frontSettings.textSize}
                       onChange={(e) => setFrontSettings({ ...frontSettings, textSize: parseInt(e.target.value) })}
@@ -1121,15 +1284,15 @@ export default function IDMarkingClient() {
                         onClick={() => handleRotateImage(true, 'right')}
                       />
                     </div>
-                    <p id="front-pinch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
-                      {t('pinchToZoom', { scale: (frontSettings.imageScale * 100).toFixed(0) })}
+                    <p id="front-touch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
+                      {t('touchGesturesHint', { scale: (frontSettings.imageScale * 100).toFixed(0) })}
                     </p>
                   </div>
                   <div className="relative">
                     <canvas
                       ref={frontEditCanvasRef}
                       aria-label={t('editFrontWatermark')}
-                      aria-describedby="front-pinch-hint"
+                      aria-describedby="front-touch-hint"
                       className="w-full rounded-lg touch-pan-y bg-white"
                       onMouseDown={(e) => handleStart(e, true)}
                       onMouseMove={(e) => handleMove(e, true)}
@@ -1238,8 +1401,8 @@ export default function IDMarkingClient() {
                     </label>
                     <input
                       type="range"
-                      min="12"
-                      max="200"
+                      min={MIN_WATERMARK_TEXT_SIZE}
+                      max={MAX_WATERMARK_TEXT_SIZE}
                       step="1"
                       value={backSettings.textSize}
                       onChange={(e) => setBackSettings({ ...backSettings, textSize: parseInt(e.target.value) })}
@@ -1277,15 +1440,15 @@ export default function IDMarkingClient() {
                         onClick={() => handleRotateImage(false, 'right')}
                       />
                     </div>
-                    <p id="back-pinch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
-                      {t('pinchToZoom', { scale: (backSettings.imageScale * 100).toFixed(0) })}
+                    <p id="back-touch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
+                      {t('touchGesturesHint', { scale: (backSettings.imageScale * 100).toFixed(0) })}
                     </p>
                   </div>
                   <div className="relative">
                     <canvas
                       ref={backEditCanvasRef}
                       aria-label={t('editBackWatermark')}
-                      aria-describedby="back-pinch-hint"
+                      aria-describedby="back-touch-hint"
                       className="w-full rounded-lg touch-pan-y bg-white"
                       onMouseDown={(e) => handleStart(e, false)}
                       onMouseMove={(e) => handleMove(e, false)}

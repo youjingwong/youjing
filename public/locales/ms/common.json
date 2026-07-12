@@ -17,7 +17,7 @@
   "editBackWatermark": "Edit Tanda Air Belakang",
   "rotateImageLeft": "Putar {{side}} 90° ke kiri",
   "rotateImageRight": "Putar {{side}} 90° ke kanan",
-  "pinchToZoom": "Cubit dengan dua jari untuk zum masuk atau keluar ({{scale}}%).",
+  "touchGesturesHint": "Tanda air: sentuh dan seret dengan satu jari; tambah jari kedua untuk ubah saiz dan putar. Cubit di tempat lain untuk zum imej ({{scale}}%).",
   "uploadImageToEdit": "Muat naik imej untuk mengedit tanda air",
   "downloadFront": "Muat Turun Hadapan",
   "downloadBack": "Muat Turun Belakang",
