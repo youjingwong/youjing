@@ -15,6 +15,11 @@
   "rotation": "Rotation",
   "editFrontWatermark": "Edit Front Watermark",
   "editBackWatermark": "Edit Back Watermark",
+  "rotateImageLeft": "Rotate {{side}} 90° left",
+  "rotateImageRight": "Rotate {{side}} 90° right",
+  "resetWatermark": "Reset watermark",
+  "resetWatermarkForSide": "Reset {{side}} watermark position, size, and angle",
+  "touchGesturesHint": "Watermark: touch and drag with one finger; add a second finger to resize and rotate. Angles snap near 0°, ±45°, and ±90°. Pinch elsewhere to zoom the image ({{scale}}%).",
   "uploadImageToEdit": "Upload an image to edit watermark",
   "downloadFront": "Download Front",
   "downloadBack": "Download Back",
@@ -36,5 +41,6 @@
   "privacyPointNoStorage": "No server image storage",
   "privacyUploadHint": "Stays on your device — never uploaded.",
   "clearImages": "Clear images",
-  "processingImage": "Processing locally…"
+  "processingImage": "Processing locally…",
+  "imageLoadError": "This image could not be opened. Please choose another file."
 }

@@ -15,6 +15,11 @@
   "rotation": "旋转角度",
   "editFrontWatermark": "编辑正面水印",
   "editBackWatermark": "编辑背面水印",
+  "rotateImageLeft": "将{{side}}向左旋转 90°",
+  "rotateImageRight": "将{{side}}向右旋转 90°",
+  "resetWatermark": "重置水印",
+  "resetWatermarkForSide": "重置{{side}}水印的位置、大小和角度",
+  "touchGesturesHint": "水印：单指按住并拖动；再放上第二根手指即可缩放和旋转。角度会在接近 0°、±45° 和 ±90° 时吸附。在其他位置捏合可缩放图片（{{scale}}%）。",
   "uploadImageToEdit": "上传图片以编辑水印",
   "downloadFront": "下载正面",
   "downloadBack": "下载背面",
@@ -36,5 +41,6 @@
   "privacyPointNoStorage": "服务器不存储图片",
   "privacyUploadHint": "图片保留在您的设备上，绝不上传。",
   "clearImages": "清除图片",
-  "processingImage": "正在本地处理…"
+  "processingImage": "正在本地处理…",
+  "imageLoadError": "无法打开此图片，请选择其他文件。"
 }

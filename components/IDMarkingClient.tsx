@@ -1,6 +1,55 @@
 import { useTranslation } from 'next-i18next/pages';
 import { useRouter } from 'next/router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  clampImageScale,
+  DEFAULT_IMAGE_SCALE,
+  endPinchGesture,
+  IMAGE_SCALE_STEP,
+  MAX_IMAGE_SCALE,
+  MIN_IMAGE_SCALE,
+  startPinchGesture,
+  updatePinchGesture,
+  type PinchGestureState,
+  type PinchSide,
+  type PinchTouch,
+} from '../lib/imageScale';
+import {
+  getCurrentImageLoadState,
+  type ImageLoadState,
+} from '../lib/imageLoadState';
+import {
+  getNextImageRotationState,
+  getRotatedImageDimensions,
+  normalizeRotation,
+  OUTPUT_CANVAS_WIDTH,
+  type ImageDimensions,
+  type RotationDirection,
+} from '../lib/imageRotation';
+import {
+  createIdleWatermarkDragState,
+  endWatermarkTransform,
+  getPointInRotatedSpace,
+  isPointInWatermarkBounds,
+  moveWatermarkDrag,
+  shouldStartWatermarkTransform,
+  startWatermarkDrag,
+  startWatermarkTransform,
+  updateWatermarkTransform,
+  MAX_WATERMARK_TEXT_SIZE,
+  MIN_WATERMARK_TEXT_SIZE,
+  type WatermarkDragInput,
+  type WatermarkDragSide,
+  type WatermarkDragState,
+  type WatermarkTransformState,
+} from '../lib/watermarkHitTest';
+import {
+  DEFAULT_WATERMARK_ROTATION,
+  DEFAULT_WATERMARK_TEXT_SIZE,
+  DEFAULT_WATERMARK_X_POSITION,
+  DEFAULT_WATERMARK_Y_POSITION,
+  resetWatermarkTransform,
+} from '../lib/watermarkSettings';
 import LanguageSwitcher from './LanguageSwitcher';
 
 interface ProcessingSettings {
@@ -12,16 +61,20 @@ interface ProcessingSettings {
   xPosition: number;
   yPosition: number;
   imageScale: number;
+  imageRotation: number;
 }
 
-interface DragState {
-  isDragging: boolean;
-  startX: number;
-  startY: number;
-  startRotation: number;
-  startSize: number;
-  type: 'move' | 'rotate' | 'resize' | null;
+interface CanvasTouchHandlers {
+  start: (event: TouchEvent) => void;
+  move: (event: TouchEvent) => void;
+  end: (event: TouchEvent) => void;
+  cancel: () => void;
 }
+
+type MultiTouchGesture =
+  | { kind: 'idle' }
+  | { kind: 'image'; state: PinchGestureState }
+  | { kind: 'watermark'; state: WatermarkTransformState };
 
 // Get default text from URL parameter or use fallback
 const getDefaultText = (defaultText: string) => {
@@ -46,11 +99,303 @@ const defaultSettings: ProcessingSettings = {
   text: 'FOR PRIVATE USE ONLY',
   color: '#000000',
   lineWidth: 5,
-  textSize: 48,
-  rotation: -45,
-  xPosition: 400,
-  yPosition: 300,
-  imageScale: 1.0,  // 100%
+  textSize: DEFAULT_WATERMARK_TEXT_SIZE,
+  rotation: DEFAULT_WATERMARK_ROTATION,
+  xPosition: DEFAULT_WATERMARK_X_POSITION,
+  yPosition: DEFAULT_WATERMARK_Y_POSITION,
+  imageScale: DEFAULT_IMAGE_SCALE,
+  imageRotation: 0,
+};
+
+interface RotateImageButtonProps {
+  direction: RotationDirection;
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}
+
+function RotateImageButton({
+  direction,
+  disabled,
+  label,
+  onClick,
+}: RotateImageButtonProps) {
+  const isLeft = direction === 'left';
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-gray-700 bg-gray-800 text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4"
+      >
+        <path d={isLeft ? 'M3 12a9 9 0 1 0 2.64-6.36L3 8' : 'M21 12a9 9 0 1 1-2.64-6.36L21 8'} />
+        <path d={isLeft ? 'M3 3v5h5' : 'M21 3v5h-5'} />
+      </svg>
+    </button>
+  );
+}
+
+interface ResetWatermarkButtonProps {
+  disabled: boolean;
+  label: string;
+  description: string;
+  onClick: () => void;
+}
+
+function ResetWatermarkButton({
+  disabled,
+  label,
+  description,
+  onClick,
+}: ResetWatermarkButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={description}
+      title={description}
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 text-sm text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-8"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4"
+      >
+        <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+        <path d="M3 3v5h5" />
+      </svg>
+      <span>{label}</span>
+    </button>
+  );
+}
+
+function useLoadedImage(file: File | null) {
+  const [loadState, setLoadState] = useState<ImageLoadState<File, HTMLImageElement> | null>(null);
+
+  useEffect(() => {
+    if (!file) return;
+
+    let cancelled = false;
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      image.onload = null;
+      image.onerror = null;
+
+      if (!cancelled) {
+        setLoadState({ file, image, hasError: false });
+      }
+    };
+    image.onerror = () => {
+      image.onload = null;
+      image.onerror = null;
+
+      if (!cancelled) {
+        setLoadState({ file, image: null, hasError: true });
+        console.error('Unable to decode the selected image');
+      }
+    };
+    image.src = objectUrl;
+
+    return () => {
+      cancelled = true;
+      image.onload = null;
+      image.onerror = null;
+      image.src = '';
+      URL.revokeObjectURL(objectUrl);
+      queueMicrotask(() => {
+        setLoadState(currentState => currentState?.file === file ? null : currentState);
+      });
+    };
+  }, [file]);
+
+  const currentLoadState = getCurrentImageLoadState(file, loadState);
+
+  return {
+    image: currentLoadState?.image ?? null,
+    isLoading: Boolean(file) && !currentLoadState,
+    hasError: currentLoadState?.hasError ?? false,
+  };
+}
+
+const getImageDimensions = (image: HTMLImageElement | null): ImageDimensions | null =>
+  image
+    ? {
+        width: image.naturalWidth || image.width,
+        height: image.naturalHeight || image.height,
+      }
+    : null;
+
+const getPinchTouches = (touches: TouchList): PinchTouch[] =>
+  Array.from(touches, touch => ({
+    identifier: touch.identifier,
+    x: touch.clientX,
+    y: touch.clientY,
+  }));
+
+const clearCanvas = (canvas: HTMLCanvasElement) => {
+  canvas.width = 300;
+  canvas.height = 150;
+  const ctx = canvas.getContext('2d');
+
+  if (ctx) {
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+};
+
+interface WatermarkLayout {
+  textWidth: number;
+  textHeight: number;
+  lineExtension: number;
+  lineSpacing: number;
+  hitboxWidth: number;
+  hitboxHeight: number;
+}
+
+const getWatermarkLayout = (
+  ctx: CanvasRenderingContext2D,
+  settings: Pick<ProcessingSettings, 'text' | 'textSize'>
+): WatermarkLayout => {
+  ctx.save();
+  ctx.font = `${settings.textSize}px "Outfit"`;
+  const textMetrics = ctx.measureText(settings.text);
+  const textWidth = textMetrics.width;
+  const textHeight =
+    textMetrics.actualBoundingBoxAscent +
+    textMetrics.actualBoundingBoxDescent;
+  const lineExtension = 50;
+  const lineSpacing = textHeight * 1.2;
+  ctx.restore();
+
+  return {
+    textWidth,
+    textHeight,
+    lineExtension,
+    lineSpacing,
+    hitboxWidth: textWidth + (lineExtension * 2),
+    hitboxHeight: (lineSpacing * 2) + textHeight,
+  };
+};
+
+const processImage = (
+  canvas: HTMLCanvasElement,
+  image: HTMLImageElement,
+  settings: ProcessingSettings
+) => {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const imageRotation = normalizeRotation(settings.imageRotation);
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  const rotatedDimensions = getRotatedImageDimensions(
+    { width: sourceWidth, height: sourceHeight },
+    imageRotation
+  );
+
+  canvas.width = OUTPUT_CANVAS_WIDTH;
+  canvas.height = OUTPUT_CANVAS_WIDTH * (rotatedDimensions.height / rotatedDimensions.width);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const baseScale = canvas.width / rotatedDimensions.width;
+  const width = sourceWidth * baseScale * settings.imageScale;
+  const height = sourceHeight * baseScale * settings.imageScale;
+
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate((imageRotation * Math.PI) / 180);
+  ctx.drawImage(image, -width / 2, -height / 2, width, height);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(settings.xPosition, settings.yPosition);
+  ctx.rotate((settings.rotation * Math.PI) / 180);
+  ctx.font = `${settings.textSize}px "Outfit"`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const {
+    textWidth,
+    lineExtension,
+    lineSpacing,
+  } = getWatermarkLayout(ctx, settings);
+  const lineStart = -textWidth / 2 - lineExtension;
+  const lineEnd = textWidth / 2 + lineExtension;
+
+  ctx.beginPath();
+  ctx.lineWidth = settings.lineWidth;
+  ctx.strokeStyle = settings.color;
+  ctx.moveTo(lineStart, -lineSpacing);
+  ctx.lineTo(lineEnd, -lineSpacing);
+  ctx.stroke();
+  ctx.moveTo(lineStart, lineSpacing);
+  ctx.lineTo(lineEnd, lineSpacing);
+  ctx.stroke();
+
+  ctx.fillStyle = settings.color;
+  ctx.fillText(settings.text, 0, 0);
+  ctx.restore();
+};
+
+const drawWatermarkSelection = (
+  overlayCanvas: HTMLCanvasElement,
+  sourceCanvas: HTMLCanvasElement,
+  settings: ProcessingSettings,
+  isVisible: boolean
+) => {
+  if (
+    overlayCanvas.width !== sourceCanvas.width ||
+    overlayCanvas.height !== sourceCanvas.height
+  ) {
+    overlayCanvas.width = sourceCanvas.width;
+    overlayCanvas.height = sourceCanvas.height;
+  }
+
+  const ctx = overlayCanvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  if (!isVisible) return;
+
+  const { hitboxWidth, hitboxHeight } = getWatermarkLayout(ctx, settings);
+  const padding = 8;
+
+  ctx.save();
+  ctx.translate(settings.xPosition, settings.yPosition);
+  ctx.rotate((settings.rotation * Math.PI) / 180);
+  ctx.setLineDash([12, 8]);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(96, 165, 250, 0.85)';
+  ctx.strokeRect(
+    -(hitboxWidth / 2) - padding,
+    -(hitboxHeight / 2) - padding,
+    hitboxWidth + (padding * 2),
+    hitboxHeight + (padding * 2)
+  );
+  ctx.restore();
 };
 
 export default function IDMarkingClient() {
@@ -59,6 +404,18 @@ export default function IDMarkingClient() {
   const initialWatermarkText = getDefaultText(t('defaultWatermarkText'));
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
+  const {
+    image: frontLoadedImage,
+    isLoading: isFrontImageLoading,
+    hasError: hasFrontImageError,
+  } = useLoadedImage(frontImage);
+  const {
+    image: backLoadedImage,
+    isLoading: isBackImageLoading,
+    hasError: hasBackImageError,
+  } = useLoadedImage(backImage);
+  const frontImageDimensions = getImageDimensions(frontLoadedImage);
+  const backImageDimensions = getImageDimensions(backLoadedImage);
   const [frontSettings, setFrontSettings] = useState<ProcessingSettings>(() => ({
     ...defaultSettings,
     text: initialWatermarkText,
@@ -69,22 +426,22 @@ export default function IDMarkingClient() {
   }));
   const frontEditCanvasRef = useRef<HTMLCanvasElement>(null);
   const backEditCanvasRef = useRef<HTMLCanvasElement>(null);
+  const frontSelectionCanvasRef = useRef<HTMLCanvasElement>(null);
+  const backSelectionCanvasRef = useRef<HTMLCanvasElement>(null);
   const frontFileInputRef = useRef<HTMLInputElement>(null);
   const backFileInputRef = useRef<HTMLInputElement>(null);
+  const frontTouchHandlersRef = useRef<CanvasTouchHandlers | null>(null);
+  const backTouchHandlersRef = useRef<CanvasTouchHandlers | null>(null);
   const frontUploadGenerationRef = useRef(0);
   const backUploadGenerationRef = useRef(0);
   const [isDraggingFront, setIsDraggingFront] = useState<boolean>(false);
   const [isDraggingBack, setIsDraggingBack] = useState<boolean>(false);
   const [isProcessingFront, setIsProcessingFront] = useState<boolean>(false);
   const [isProcessingBack, setIsProcessingBack] = useState<boolean>(false);
-  const dragStateRef = useRef<DragState>({
-    isDragging: false,
-    startX: 0,
-    startY: 0,
-    startRotation: 0,
-    startSize: 0,
-    type: null,
-  });
+  const dragStateRef = useRef<WatermarkDragState>(createIdleWatermarkDragState());
+  const multiTouchGestureRef = useRef<MultiTouchGesture>({ kind: 'idle' });
+  const [activeWatermarkSide, setActiveWatermarkSide] =
+    useState<WatermarkDragSide | null>(null);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
   useEffect(() => {
@@ -124,8 +481,76 @@ export default function IDMarkingClient() {
     };
   }, [i18n, router]);
 
+  const resetDragState = () => {
+    dragStateRef.current = createIdleWatermarkDragState();
+  };
+
+  const resetMultiTouchGesture = () => {
+    multiTouchGestureRef.current = { kind: 'idle' };
+  };
+
+  const beginImagePinch = (
+    touches: TouchList,
+    isFront: boolean,
+    startScale: number
+  ) => {
+    if (touches.length < 2) return false;
+
+    const side: PinchSide = isFront ? 'front' : 'back';
+    multiTouchGestureRef.current = {
+      kind: 'image',
+      state: startPinchGesture(getPinchTouches(touches), side, startScale),
+    };
+    setActiveWatermarkSide(null);
+
+    return true;
+  };
+
+  const beginWatermarkTransform = (
+    touches: TouchList,
+    isFront: boolean,
+    textSize: number,
+    rotation: number,
+    preferredTouchIdentifier: number | null = null
+  ) => {
+    if (touches.length < 2) return false;
+
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+    const transformTouches = getPinchTouches(touches);
+    const preferredTouch = preferredTouchIdentifier === null
+      ? null
+      : transformTouches.find(
+          touch => touch.identifier === preferredTouchIdentifier
+        );
+    const orderedTouches = preferredTouch
+      ? [
+          preferredTouch,
+          ...transformTouches.filter(
+            touch => touch.identifier !== preferredTouchIdentifier
+          ),
+        ]
+      : transformTouches;
+
+    multiTouchGestureRef.current = {
+      kind: 'watermark',
+      state: startWatermarkTransform(
+        orderedTouches,
+        side,
+        textSize,
+        rotation
+      ),
+    };
+    setActiveWatermarkSide(side);
+
+    return true;
+  };
+
   const handleImageUpload = async (file: File, isFront: boolean) => {
     if (!file || !isSupportedImage(file)) return;
+
+    resetDragState();
+    resetMultiTouchGesture();
+    setActiveWatermarkSide(null);
 
     const uploadGenerationRef = isFront ? frontUploadGenerationRef : backUploadGenerationRef;
     const setIsProcessing = isFront ? setIsProcessingFront : setIsProcessingBack;
@@ -150,8 +575,22 @@ export default function IDMarkingClient() {
       if (uploadGenerationRef.current !== requestId) return;
 
       if (isFront) {
+        setFrontSettings(prev => ({
+          ...prev,
+          imageScale: DEFAULT_IMAGE_SCALE,
+          imageRotation: 0,
+          xPosition: defaultSettings.xPosition,
+          yPosition: defaultSettings.yPosition,
+        }));
         setFrontImage(imageFile);
       } else {
+        setBackSettings(prev => ({
+          ...prev,
+          imageScale: DEFAULT_IMAGE_SCALE,
+          imageRotation: 0,
+          xPosition: defaultSettings.xPosition,
+          yPosition: defaultSettings.yPosition,
+        }));
         setBackImage(imageFile);
       }
     } catch (error) {
@@ -179,6 +618,23 @@ export default function IDMarkingClient() {
     setIsProcessingFront(false);
     setIsProcessingBack(false);
     setDebugInfo([]);
+    resetDragState();
+    resetMultiTouchGesture();
+    setActiveWatermarkSide(null);
+    setFrontSettings(prev => ({
+      ...prev,
+      imageScale: DEFAULT_IMAGE_SCALE,
+      imageRotation: 0,
+      xPosition: defaultSettings.xPosition,
+      yPosition: defaultSettings.yPosition,
+    }));
+    setBackSettings(prev => ({
+      ...prev,
+      imageScale: DEFAULT_IMAGE_SCALE,
+      imageRotation: 0,
+      xPosition: defaultSettings.xPosition,
+      yPosition: defaultSettings.yPosition,
+    }));
 
     if (frontFileInputRef.current) {
       frontFileInputRef.current.value = '';
@@ -188,129 +644,173 @@ export default function IDMarkingClient() {
     }
   };
 
-  const getCanvasPosition = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
+  const handleRotateImage = (isFront: boolean, direction: RotationDirection) => {
+    const setSettings = isFront ? setFrontSettings : setBackSettings;
+    const imageDimensions = isFront ? frontImageDimensions : backImageDimensions;
+
+    if (!imageDimensions) return;
+
+    resetDragState();
+    resetMultiTouchGesture();
+    setActiveWatermarkSide(null);
+
+    setSettings(prev => ({
+      ...prev,
+      ...getNextImageRotationState(
+        imageDimensions,
+        prev.imageRotation,
+        prev.yPosition,
+        direction
+      ),
+    }));
+  };
+
+  const handleResetWatermark = (isFront: boolean) => {
+    const imageDimensions = isFront
+      ? frontImageDimensions
+      : backImageDimensions;
+    const setSettings = isFront ? setFrontSettings : setBackSettings;
+
+    if (!imageDimensions) return;
+
+    resetDragState();
+    resetMultiTouchGesture();
+    setActiveWatermarkSide(null);
+    setSettings(prev => resetWatermarkTransform(prev, imageDimensions));
+  };
+
+  const getCanvasPointer = (
+    e: React.MouseEvent<HTMLCanvasElement> | TouchEvent,
+    canvas: HTMLCanvasElement,
+    expectedTouchIdentifier: number | null = null
+  ) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-
-    let clientX, clientY;
+    let clientX: number;
+    let clientY: number;
+    let input: WatermarkDragInput;
+    let touchIdentifier: number | null = null;
 
     if ('touches' in e) {
-      // Touch event
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
+      const targetTouches = Array.from(e.targetTouches);
+      const touch = expectedTouchIdentifier === null
+        ? targetTouches[0]
+        : targetTouches.find(item => item.identifier === expectedTouchIdentifier);
+
+      if (!touch) return null;
+
+      clientX = touch.clientX;
+      clientY = touch.clientY;
+      input = 'touch';
+      touchIdentifier = touch.identifier;
     } else {
       // Mouse event
       clientX = e.clientX;
       clientY = e.clientY;
+      input = 'mouse';
     }
 
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY
+      point: {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY,
+      },
+      input,
+      touchIdentifier,
     };
   };
 
-  const handleStart = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, isFront: boolean) => {
-    e.preventDefault();
+  const handleStart = (e: React.MouseEvent<HTMLCanvasElement> | TouchEvent, isFront: boolean) => {
     const canvas = isFront ? frontEditCanvasRef.current : backEditCanvasRef.current;
     const settings = isFront ? frontSettings : backSettings;
     if (!canvas) return;
 
-    const { x, y } = getCanvasPosition(e, canvas);
+    resetDragState();
 
-    // Transform click/touch coordinates to account for watermark rotation
-    const centerX = settings.xPosition;
-    const centerY = settings.yPosition;
-    const angle = (settings.rotation * Math.PI) / 180;
-
-    // Translate point to origin
-    const dx = x - centerX;
-    const dy = y - centerY;
-
-    // Rotate point
-    const rotatedX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
-    const rotatedY = dx * Math.sin(-angle) + dy * Math.cos(-angle);
+    const pointer = getCanvasPointer(e, canvas);
+    if (!pointer) return;
+    const { x, y } = pointer.point;
 
     // Get text metrics for accurate hitbox
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.save();
-    ctx.font = `${settings.textSize}px "Outfit"`;
-    const textMetrics = ctx.measureText(settings.text);
-    const textWidth = textMetrics.width;
-    const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
-    const lineExtension = 50; // Extra length beyond text on each side
-    const lineSpacing = textHeight * 1.2; // Space between text and lines
-    ctx.restore();
+    const { hitboxWidth, hitboxHeight } = getWatermarkLayout(ctx, settings);
 
-    // Calculate hitbox dimensions based on text metrics
-    const hitboxWidth = textWidth + (lineExtension * 2); // Text width plus line extensions
-    const hitboxHeight = (lineSpacing * 2) + textHeight; // Height including lines and text
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+    const dragState = startWatermarkDrag(
+      pointer.point,
+      { x: settings.xPosition, y: settings.yPosition },
+      settings.rotation,
+      hitboxWidth,
+      hitboxHeight,
+      side,
+      pointer.input,
+      pointer.touchIdentifier
+    );
+    dragStateRef.current = dragState;
 
-    // Check if point is within watermark bounds
-    const isInBox =
-      rotatedX >= -hitboxWidth / 2 && // left bound
-      rotatedX <= hitboxWidth / 2 && // right bound
-      rotatedY >= -hitboxHeight / 2 && // top bound
-      rotatedY <= hitboxHeight / 2; // bottom bound
-
-    if (isInBox) {
-      dragStateRef.current = {
-        isDragging: true,
-        startX: x,
-        startY: y,
-        startRotation: settings.rotation,
-        startSize: settings.textSize,
-        type: 'move',
-      };
+    if (dragState.isDragging) {
+      setActiveWatermarkSide(side);
+      e.preventDefault();
+    } else {
+      setActiveWatermarkSide(currentSide =>
+        currentSide === side ? null : currentSide
+      );
     }
   };
 
-  const handleMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, isFront: boolean) => {
-    e.preventDefault();
+  const handleMove = (e: React.MouseEvent<HTMLCanvasElement> | TouchEvent, isFront: boolean) => {
+    const isTouchEvent = 'touches' in e;
+
+    if (isTouchEvent && !dragStateRef.current.isDragging) return;
+
     const canvas = isFront ? frontEditCanvasRef.current : backEditCanvasRef.current;
     const settings = isFront ? frontSettings : backSettings;
     const setSettings = isFront ? setFrontSettings : setBackSettings;
     if (!canvas) return;
 
-    const { x, y } = getCanvasPosition(e, canvas);
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+    const expectedTouchIdentifier =
+      dragStateRef.current.isDragging &&
+      dragStateRef.current.side === side &&
+      dragStateRef.current.input === 'touch'
+        ? dragStateRef.current.touchIdentifier
+        : null;
+    const pointer = getCanvasPointer(e, canvas, expectedTouchIdentifier);
+    if (!pointer) return;
+    const { x, y } = pointer.point;
 
-    // Transform coordinates to check hover state
-    const dx = x - settings.xPosition;
-    const dy = y - settings.yPosition;
-    const angle = (settings.rotation * Math.PI) / 180;
-    const rotatedX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
-    const rotatedY = dx * Math.sin(-angle) + dy * Math.cos(-angle);
+    const rotatedPoint = getPointInRotatedSpace(
+      { x, y },
+      { x: settings.xPosition, y: settings.yPosition },
+      settings.rotation
+    );
 
     // Get text metrics for accurate hitbox
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.save();
-    ctx.font = `${settings.textSize}px "Outfit"`;
-    const textMetrics = ctx.measureText(settings.text);
-    const textWidth = textMetrics.width;
-    const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
-    const lineExtension = 50;
-    const lineSpacing = textHeight * 1.2;
-    ctx.restore();
+    const {
+      textWidth,
+      textHeight,
+      hitboxWidth,
+      hitboxHeight,
+    } = getWatermarkLayout(ctx, settings);
 
-    // Calculate hitbox dimensions based on text metrics
-    const hitboxWidth = textWidth + (lineExtension * 2);
-    const hitboxHeight = (lineSpacing * 2) + textHeight;
-
-    const isInBox =
-      rotatedX >= -hitboxWidth / 2 &&
-      rotatedX <= hitboxWidth / 2 &&
-      rotatedY >= -hitboxHeight / 2 &&
-      rotatedY <= hitboxHeight / 2;
+    const isInBox = isPointInWatermarkBounds(
+      { x, y },
+      { x: settings.xPosition, y: settings.yPosition },
+      settings.rotation,
+      hitboxWidth,
+      hitboxHeight
+    );
 
     // Update debug info
     setDebugInfo([
       `Mouse: (${Math.round(x)}, ${Math.round(y)})`,
-      `Rotated: (${Math.round(rotatedX)}, ${Math.round(rotatedY)})`,
+      `Rotated: (${Math.round(rotatedPoint.x)}, ${Math.round(rotatedPoint.y)})`,
       `Text Center: (${Math.round(settings.xPosition)}, ${Math.round(settings.yPosition)})`,
       `Text Size: ${settings.textSize}px`,
       `Text Width: ${Math.round(textWidth)}px`,
@@ -323,27 +823,314 @@ export default function IDMarkingClient() {
     ]);
 
     // Update cursor style based on hover position (mouse only)
-    if (!dragStateRef.current.isDragging && !('touches' in e)) {
+    if (!dragStateRef.current.isDragging && !isTouchEvent) {
       canvas.style.cursor = isInBox ? 'move' : 'default';
       return;
     }
 
-    if (dragStateRef.current.type === 'move') {
-      const dx = x - dragStateRef.current.startX;
-      const dy = y - dragStateRef.current.startY;
+    const dragMove = moveWatermarkDrag(
+      dragStateRef.current,
+      pointer.point,
+      side,
+      pointer.input,
+      pointer.touchIdentifier
+    );
+    const dragDelta = dragMove.delta;
+
+    if (dragDelta) {
+      e.preventDefault();
       setSettings((prev) => ({
         ...prev,
-        xPosition: prev.xPosition + dx,
-        yPosition: prev.yPosition + dy,
+        xPosition: prev.xPosition + dragDelta.x,
+        yPosition: prev.yPosition + dragDelta.y,
       }));
-      dragStateRef.current.startX = x;
-      dragStateRef.current.startY = y;
+      dragStateRef.current = dragMove.state;
     }
   };
 
   const handleEnd = () => {
-    dragStateRef.current.isDragging = false;
+    resetDragState();
+    setActiveWatermarkSide(null);
   };
+
+  const handleTouchStart = (
+    e: TouchEvent,
+    isFront: boolean
+  ) => {
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+    const activeGesture = multiTouchGestureRef.current;
+
+    if (
+      activeGesture.kind !== 'idle' &&
+      activeGesture.state.side !== side
+    ) {
+      return;
+    }
+
+    if (e.targetTouches.length >= 2) {
+      if (activeGesture.kind !== 'idle') {
+        e.preventDefault();
+        return;
+      }
+
+      const settings = isFront ? frontSettings : backSettings;
+      const activeTouchIdentifiers = getPinchTouches(e.targetTouches).map(
+        touch => touch.identifier
+      );
+      const shouldTransformWatermark = shouldStartWatermarkTransform(
+        dragStateRef.current,
+        side,
+        activeTouchIdentifiers
+      );
+      const initiatingTouchIdentifier = dragStateRef.current.touchIdentifier;
+
+      e.preventDefault();
+      resetDragState();
+      if (shouldTransformWatermark) {
+        beginWatermarkTransform(
+          e.targetTouches,
+          isFront,
+          settings.textSize,
+          settings.rotation,
+          initiatingTouchIdentifier
+        );
+      } else {
+        beginImagePinch(e.targetTouches, isFront, settings.imageScale);
+      }
+      return;
+    }
+
+    resetMultiTouchGesture();
+    handleStart(e, isFront);
+  };
+
+  const handleTouchMove = (
+    e: TouchEvent,
+    isFront: boolean
+  ) => {
+    const activeGesture = multiTouchGestureRef.current;
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+
+    if (
+      activeGesture.kind === 'watermark' &&
+      activeGesture.state.side === side
+    ) {
+      e.preventDefault();
+      const transformUpdate = updateWatermarkTransform(
+        activeGesture.state,
+        getPinchTouches(e.targetTouches),
+        side
+      );
+      multiTouchGestureRef.current = {
+        kind: 'watermark',
+        state: transformUpdate.state,
+      };
+
+      if (
+        transformUpdate.textSize !== null &&
+        transformUpdate.rotation !== null
+      ) {
+        const textSize = transformUpdate.textSize;
+        const rotation = transformUpdate.rotation;
+        const setSettings = isFront ? setFrontSettings : setBackSettings;
+        setSettings(prev => ({
+          ...prev,
+          textSize,
+          rotation,
+        }));
+      }
+      return;
+    }
+
+    if (activeGesture.kind === 'image' && activeGesture.state.side === side) {
+      e.preventDefault();
+
+      const pinchUpdate = updatePinchGesture(
+        activeGesture.state,
+        getPinchTouches(e.targetTouches),
+        side
+      );
+      multiTouchGestureRef.current = {
+        kind: 'image',
+        state: pinchUpdate.state,
+      };
+      const imageScale = pinchUpdate.imageScale;
+
+      if (imageScale !== null) {
+        const setSettings = isFront ? setFrontSettings : setBackSettings;
+        setSettings(prev => prev.imageScale === imageScale
+          ? prev
+          : { ...prev, imageScale });
+      }
+      return;
+    }
+
+    if (activeGesture.kind !== 'idle') return;
+
+    if (e.targetTouches.length >= 2) {
+      e.preventDefault();
+      const settings = isFront ? frontSettings : backSettings;
+      const activeTouchIdentifiers = getPinchTouches(e.targetTouches).map(
+        touch => touch.identifier
+      );
+      const shouldTransformWatermark = shouldStartWatermarkTransform(
+        dragStateRef.current,
+        side,
+        activeTouchIdentifiers
+      );
+      const initiatingTouchIdentifier = dragStateRef.current.touchIdentifier;
+
+      resetDragState();
+      if (shouldTransformWatermark) {
+        beginWatermarkTransform(
+          e.targetTouches,
+          isFront,
+          settings.textSize,
+          settings.rotation,
+          initiatingTouchIdentifier
+        );
+      } else {
+        beginImagePinch(e.targetTouches, isFront, settings.imageScale);
+      }
+      return;
+    }
+
+    if (e.targetTouches.length === 1) {
+      handleMove(e, isFront);
+    }
+  };
+
+  const handleTouchEnd = (
+    e: TouchEvent,
+    isFront: boolean
+  ) => {
+    const activeGesture = multiTouchGestureRef.current;
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+
+    if (
+      activeGesture.kind === 'watermark' &&
+      activeGesture.state.side === side
+    ) {
+      const nextState = endWatermarkTransform(
+        activeGesture.state,
+        getPinchTouches(e.targetTouches),
+        side
+      );
+      multiTouchGestureRef.current = nextState.isTransforming
+        ? { kind: 'watermark', state: nextState }
+        : { kind: 'idle' };
+      if (!nextState.isTransforming) {
+        setActiveWatermarkSide(null);
+      }
+      resetDragState();
+      return;
+    }
+
+    if (activeGesture.kind === 'image' && activeGesture.state.side === side) {
+      const nextState = endPinchGesture(
+        activeGesture.state,
+        getPinchTouches(e.targetTouches),
+        side
+      );
+      multiTouchGestureRef.current = nextState.isPinching
+        ? { kind: 'image', state: nextState }
+        : { kind: 'idle' };
+      setActiveWatermarkSide(null);
+      resetDragState();
+      return;
+    }
+
+    if (activeGesture.kind !== 'idle') return;
+
+    resetMultiTouchGesture();
+    resetDragState();
+    setActiveWatermarkSide(null);
+  };
+
+  const handleTouchCancel = (isFront: boolean) => {
+    const activeGesture = multiTouchGestureRef.current;
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+
+    if (
+      activeGesture.kind !== 'idle' &&
+      activeGesture.state.side !== side
+    ) {
+      return;
+    }
+
+    resetMultiTouchGesture();
+    resetDragState();
+    setActiveWatermarkSide(null);
+  };
+
+  useLayoutEffect(() => {
+    frontTouchHandlersRef.current = {
+      start: event => handleTouchStart(event, true),
+      move: event => handleTouchMove(event, true),
+      end: event => handleTouchEnd(event, true),
+      cancel: () => handleTouchCancel(true),
+    };
+    backTouchHandlersRef.current = {
+      start: event => handleTouchStart(event, false),
+      move: event => handleTouchMove(event, false),
+      end: event => handleTouchEnd(event, false),
+      cancel: () => handleTouchCancel(false),
+    };
+  });
+
+  useLayoutEffect(() => {
+    const canvas = frontEditCanvasRef.current;
+    if (!canvas) return;
+
+    const handleNativeTouchStart = (event: TouchEvent) =>
+      frontTouchHandlersRef.current?.start(event);
+    const handleNativeTouchMove = (event: TouchEvent) =>
+      frontTouchHandlersRef.current?.move(event);
+    const handleNativeTouchEnd = (event: TouchEvent) =>
+      frontTouchHandlersRef.current?.end(event);
+    const handleNativeTouchCancel = () =>
+      frontTouchHandlersRef.current?.cancel();
+    const options: AddEventListenerOptions = { passive: false };
+
+    canvas.addEventListener('touchstart', handleNativeTouchStart, options);
+    canvas.addEventListener('touchmove', handleNativeTouchMove, options);
+    canvas.addEventListener('touchend', handleNativeTouchEnd, options);
+    canvas.addEventListener('touchcancel', handleNativeTouchCancel, options);
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleNativeTouchStart);
+      canvas.removeEventListener('touchmove', handleNativeTouchMove);
+      canvas.removeEventListener('touchend', handleNativeTouchEnd);
+      canvas.removeEventListener('touchcancel', handleNativeTouchCancel);
+    };
+  }, [frontImage]);
+
+  useLayoutEffect(() => {
+    const canvas = backEditCanvasRef.current;
+    if (!canvas) return;
+
+    const handleNativeTouchStart = (event: TouchEvent) =>
+      backTouchHandlersRef.current?.start(event);
+    const handleNativeTouchMove = (event: TouchEvent) =>
+      backTouchHandlersRef.current?.move(event);
+    const handleNativeTouchEnd = (event: TouchEvent) =>
+      backTouchHandlersRef.current?.end(event);
+    const handleNativeTouchCancel = () =>
+      backTouchHandlersRef.current?.cancel();
+    const options: AddEventListenerOptions = { passive: false };
+
+    canvas.addEventListener('touchstart', handleNativeTouchStart, options);
+    canvas.addEventListener('touchmove', handleNativeTouchMove, options);
+    canvas.addEventListener('touchend', handleNativeTouchEnd, options);
+    canvas.addEventListener('touchcancel', handleNativeTouchCancel, options);
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleNativeTouchStart);
+      canvas.removeEventListener('touchmove', handleNativeTouchMove);
+      canvas.removeEventListener('touchend', handleNativeTouchEnd);
+      canvas.removeEventListener('touchcancel', handleNativeTouchCancel);
+    };
+  }, [backImage]);
 
   const handleDownload = (canvas: HTMLCanvasElement, suffix: string) => {
     // For iOS Chrome compatibility
@@ -419,156 +1206,43 @@ export default function IDMarkingClient() {
     handleDownload(canvas, 'combined');
   };
 
-  const processImage = (
-    canvas: HTMLCanvasElement,
-    image: HTMLImageElement,
-    settings: ProcessingSettings,
-    showControls = false
-  ) => {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set canvas dimensions
-    canvas.width = 1500; // Fixed canvas size
-    canvas.height = 1500 * (image.height / image.width); // Maintain aspect ratio
-
-    // Clear canvas
-    ctx.fillStyle = '#FFFFFF'; // White background
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Calculate dimensions to fill width at 100% scale
-    const width = canvas.width * settings.imageScale;
-    const height = (canvas.width * (image.height / image.width)) * settings.imageScale;
-
-    // Center the scaled image
-    const x = (canvas.width - width) / 2;
-    const y = (canvas.height - height) / 2;
-
-    // Draw image
-    ctx.drawImage(image, x, y, width, height);
-
-    // Save context state
-    ctx.save();
-
-    // Transform context for rotated text and lines
-    ctx.translate(settings.xPosition, settings.yPosition);
-    ctx.rotate((settings.rotation * Math.PI) / 180);
-
-    // Set up text properties
-    ctx.font = `${settings.textSize}px "Outfit"`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Measure text to position lines
-    const textMetrics = ctx.measureText(settings.text);
-    const textWidth = textMetrics.width;
-    const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
-    const lineExtension = 50; // Extra length beyond text on each side
-    const lineSpacing = textHeight * 1.2; // Space between text and lines
-    const lineStart = -textWidth / 2 - lineExtension;
-    const lineEnd = textWidth / 2 + lineExtension;
-
-    // Draw lines
-    ctx.beginPath();
-    ctx.lineWidth = settings.lineWidth;
-    ctx.strokeStyle = settings.color;
-
-    // First line (top)
-    ctx.moveTo(lineStart, -lineSpacing);
-    ctx.lineTo(lineEnd, -lineSpacing);
-    ctx.stroke();
-
-    // Second line (bottom)
-    ctx.moveTo(lineStart, lineSpacing);
-    ctx.lineTo(lineEnd, lineSpacing);
-    ctx.stroke();
-
-    // Draw text
-    ctx.fillStyle = settings.color;
-    ctx.fillText(settings.text, 0, 0);
-
-    // Restore context state
-    ctx.restore();
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    const objectUrls = new Set<string>();
-    const cancelImageLoads = new Set<() => void>();
-
-    const updateCanvas = async (
-      image: File,
-      editCanvas: HTMLCanvasElement | null,
-      settings: ProcessingSettings
-    ) => {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(image);
-      objectUrls.add(objectUrl);
-
-      try {
-        await new Promise<void>((resolve, reject) => {
-          const clearHandlers = () => {
-            img.onload = null;
-            img.onerror = null;
-          };
-          const cancelLoad = () => {
-            clearHandlers();
-            img.src = '';
-            reject(new DOMException('Image load cancelled', 'AbortError'));
-          };
-
-          cancelImageLoads.add(cancelLoad);
-          img.onload = () => {
-            cancelImageLoads.delete(cancelLoad);
-            clearHandlers();
-            resolve();
-          };
-          img.onerror = () => {
-            cancelImageLoads.delete(cancelLoad);
-            clearHandlers();
-            reject(new Error('Unable to decode the selected image'));
-          };
-          img.src = objectUrl;
-        });
-
-        if (!cancelled && editCanvas) {
-          processImage(editCanvas, img, settings, true);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('Error loading image:', error);
-        }
-      } finally {
-        if (objectUrls.delete(objectUrl)) {
-          URL.revokeObjectURL(objectUrl);
-        }
-      }
-    };
-
-    if (frontImage) {
-      updateCanvas(
-        frontImage,
-        frontEditCanvasRef.current,
-        frontSettings
-      );
+  useLayoutEffect(() => {
+    if (frontLoadedImage && frontEditCanvasRef.current) {
+      processImage(frontEditCanvasRef.current, frontLoadedImage, frontSettings);
+    } else if (frontImage && frontEditCanvasRef.current) {
+      clearCanvas(frontEditCanvasRef.current);
     }
+  }, [frontImage, frontLoadedImage, frontSettings]);
 
-    if (backImage) {
-      updateCanvas(
-        backImage,
-        backEditCanvasRef.current,
-        backSettings
-      );
+  useLayoutEffect(() => {
+    if (backLoadedImage && backEditCanvasRef.current) {
+      processImage(backEditCanvasRef.current, backLoadedImage, backSettings);
+    } else if (backImage && backEditCanvasRef.current) {
+      clearCanvas(backEditCanvasRef.current);
     }
+  }, [backImage, backLoadedImage, backSettings]);
 
-    return () => {
-      cancelled = true;
-      cancelImageLoads.forEach((cancelLoad) => cancelLoad());
-      cancelImageLoads.clear();
-      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
-      objectUrls.clear();
-    };
-  }, [frontImage, backImage, frontSettings, backSettings]);
+  useLayoutEffect(() => {
+    if (!frontSelectionCanvasRef.current || !frontEditCanvasRef.current) return;
+
+    drawWatermarkSelection(
+      frontSelectionCanvasRef.current,
+      frontEditCanvasRef.current,
+      frontSettings,
+      activeWatermarkSide === 'front' && Boolean(frontLoadedImage)
+    );
+  }, [activeWatermarkSide, frontLoadedImage, frontSettings]);
+
+  useLayoutEffect(() => {
+    if (!backSelectionCanvasRef.current || !backEditCanvasRef.current) return;
+
+    drawWatermarkSelection(
+      backSelectionCanvasRef.current,
+      backEditCanvasRef.current,
+      backSettings,
+      activeWatermarkSide === 'back' && Boolean(backLoadedImage)
+    );
+  }, [activeWatermarkSide, backLoadedImage, backSettings]);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, isFront: boolean) => {
     e.preventDefault();
@@ -696,11 +1370,14 @@ export default function IDMarkingClient() {
                     </label>
                     <input
                       type="range"
-                      min="0.5"
-                      max="1.0"
-                      step="0.05"
+                      min={MIN_IMAGE_SCALE}
+                      max={MAX_IMAGE_SCALE}
+                      step={IMAGE_SCALE_STEP}
                       value={frontSettings.imageScale}
-                      onChange={(e) => setFrontSettings({ ...frontSettings, imageScale: parseFloat(e.target.value) })}
+                      onChange={(e) => setFrontSettings({
+                        ...frontSettings,
+                        imageScale: clampImageScale(parseFloat(e.target.value)),
+                      })}
                       className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mb-4"
                     />
                   </div>
@@ -730,8 +1407,8 @@ export default function IDMarkingClient() {
                     </label>
                     <input
                       type="range"
-                      min="12"
-                      max="200"
+                      min={MIN_WATERMARK_TEXT_SIZE}
+                      max={MAX_WATERMARK_TEXT_SIZE}
                       step="1"
                       value={frontSettings.textSize}
                       onChange={(e) => setFrontSettings({ ...frontSettings, textSize: parseInt(e.target.value) })}
@@ -753,29 +1430,62 @@ export default function IDMarkingClient() {
                 </div>
 
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">{t('editFrontWatermark')}</h2>
+                  <div className="mb-4">
+                    <h2 className="text-xl font-semibold">{t('editFrontWatermark')}</h2>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <RotateImageButton
+                        direction="left"
+                        disabled={!frontImageDimensions || isProcessingFront}
+                        label={t('rotateImageLeft', { side: t('frontID') })}
+                        onClick={() => handleRotateImage(true, 'left')}
+                      />
+                      <RotateImageButton
+                        direction="right"
+                        disabled={!frontImageDimensions || isProcessingFront}
+                        label={t('rotateImageRight', { side: t('frontID') })}
+                        onClick={() => handleRotateImage(true, 'right')}
+                      />
+                      <ResetWatermarkButton
+                        disabled={!frontImageDimensions || isProcessingFront}
+                        label={t('resetWatermark')}
+                        description={t('resetWatermarkForSide', { side: t('frontID') })}
+                        onClick={() => handleResetWatermark(true)}
+                      />
+                    </div>
+                    <p id="front-touch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
+                      {t('touchGesturesHint', { scale: (frontSettings.imageScale * 100).toFixed(0) })}
+                    </p>
+                  </div>
                   <div className="relative">
                     <canvas
                       ref={frontEditCanvasRef}
-                      className="w-full rounded-lg touch-none bg-white"
+                      aria-label={t('editFrontWatermark')}
+                      aria-describedby="front-touch-hint"
+                      className="block w-full rounded-lg touch-pan-y bg-white"
                       onMouseDown={(e) => handleStart(e, true)}
                       onMouseMove={(e) => handleMove(e, true)}
                       onMouseUp={handleEnd}
                       onMouseLeave={handleEnd}
-                      onTouchStart={(e) => handleStart(e, true)}
-                      onTouchMove={(e) => handleMove(e, true)}
-                      onTouchEnd={handleEnd}
                     />
-                    {!frontImage && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <p className="text-gray-400">{t('uploadImageToEdit')}</p>
+                    <canvas
+                      ref={frontSelectionCanvasRef}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 h-full w-full rounded-lg"
+                    />
+                    {(isFrontImageLoading || hasFrontImageError) && (
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/90 px-4 text-center">
+                        <p className="text-sm text-gray-700">
+                          {hasFrontImageError ? t('imageLoadError') : t('processingImage')}
+                        </p>
                       </div>
                     )}
                   </div>
                   <div className="flex justify-center mt-4">
                     <button
-                      onClick={() => frontEditCanvasRef.current && handleDownload(frontEditCanvasRef.current, 'front')}
-                      className="px-4 py-2 bg-gray-800 text-white rounded-sm hover:bg-gray-700 border border-gray-600"
+                      type="button"
+                      disabled={!frontLoadedImage}
+                      onClick={() => frontLoadedImage && frontEditCanvasRef.current && handleDownload(frontEditCanvasRef.current, 'front')}
+                      className="px-4 py-2 bg-gray-800 text-white rounded-sm hover:bg-gray-700 border border-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {t('downloadFront')}
                     </button>
@@ -827,11 +1537,14 @@ export default function IDMarkingClient() {
                     </label>
                     <input
                       type="range"
-                      min="0.5"
-                      max="1.0"
-                      step="0.05"
+                      min={MIN_IMAGE_SCALE}
+                      max={MAX_IMAGE_SCALE}
+                      step={IMAGE_SCALE_STEP}
                       value={backSettings.imageScale}
-                      onChange={(e) => setBackSettings({ ...backSettings, imageScale: parseFloat(e.target.value) })}
+                      onChange={(e) => setBackSettings({
+                        ...backSettings,
+                        imageScale: clampImageScale(parseFloat(e.target.value)),
+                      })}
                       className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mb-4"
                     />
                   </div>
@@ -861,8 +1574,8 @@ export default function IDMarkingClient() {
                     </label>
                     <input
                       type="range"
-                      min="12"
-                      max="200"
+                      min={MIN_WATERMARK_TEXT_SIZE}
+                      max={MAX_WATERMARK_TEXT_SIZE}
                       step="1"
                       value={backSettings.textSize}
                       onChange={(e) => setBackSettings({ ...backSettings, textSize: parseInt(e.target.value) })}
@@ -884,29 +1597,62 @@ export default function IDMarkingClient() {
                 </div>
 
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">{t('editBackWatermark')}</h2>
+                  <div className="mb-4">
+                    <h2 className="text-xl font-semibold">{t('editBackWatermark')}</h2>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <RotateImageButton
+                        direction="left"
+                        disabled={!backImageDimensions || isProcessingBack}
+                        label={t('rotateImageLeft', { side: t('backID') })}
+                        onClick={() => handleRotateImage(false, 'left')}
+                      />
+                      <RotateImageButton
+                        direction="right"
+                        disabled={!backImageDimensions || isProcessingBack}
+                        label={t('rotateImageRight', { side: t('backID') })}
+                        onClick={() => handleRotateImage(false, 'right')}
+                      />
+                      <ResetWatermarkButton
+                        disabled={!backImageDimensions || isProcessingBack}
+                        label={t('resetWatermark')}
+                        description={t('resetWatermarkForSide', { side: t('backID') })}
+                        onClick={() => handleResetWatermark(false)}
+                      />
+                    </div>
+                    <p id="back-touch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
+                      {t('touchGesturesHint', { scale: (backSettings.imageScale * 100).toFixed(0) })}
+                    </p>
+                  </div>
                   <div className="relative">
                     <canvas
                       ref={backEditCanvasRef}
-                      className="w-full rounded-lg touch-none bg-white"
+                      aria-label={t('editBackWatermark')}
+                      aria-describedby="back-touch-hint"
+                      className="block w-full rounded-lg touch-pan-y bg-white"
                       onMouseDown={(e) => handleStart(e, false)}
                       onMouseMove={(e) => handleMove(e, false)}
                       onMouseUp={handleEnd}
                       onMouseLeave={handleEnd}
-                      onTouchStart={(e) => handleStart(e, false)}
-                      onTouchMove={(e) => handleMove(e, false)}
-                      onTouchEnd={handleEnd}
                     />
-                    {!backImage && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <p className="text-gray-400">{t('uploadImageToEdit')}</p>
+                    <canvas
+                      ref={backSelectionCanvasRef}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 h-full w-full rounded-lg"
+                    />
+                    {(isBackImageLoading || hasBackImageError) && (
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/90 px-4 text-center">
+                        <p className="text-sm text-gray-700">
+                          {hasBackImageError ? t('imageLoadError') : t('processingImage')}
+                        </p>
                       </div>
                     )}
                   </div>
                   <div className="flex justify-center mt-4">
                     <button
-                      onClick={() => backEditCanvasRef.current && handleDownload(backEditCanvasRef.current, 'back')}
-                      className="px-4 py-2 bg-gray-800 text-white rounded-sm hover:bg-gray-700 border border-gray-600"
+                      type="button"
+                      disabled={!backLoadedImage}
+                      onClick={() => backLoadedImage && backEditCanvasRef.current && handleDownload(backEditCanvasRef.current, 'back')}
+                      className="px-4 py-2 bg-gray-800 text-white rounded-sm hover:bg-gray-700 border border-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {t('downloadBack')}
                     </button>
@@ -918,7 +1664,7 @@ export default function IDMarkingClient() {
         </div>
 
         {/* Combined Download Button */}
-        {frontImage && backImage && (
+        {frontLoadedImage && backLoadedImage && (
           <div className="text-center mt-8">
             <button
               onClick={handleCombinedDownload}
