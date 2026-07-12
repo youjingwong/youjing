@@ -1453,7 +1453,7 @@ export default function IDMarkingClient() {
 
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <div className="mb-4">
-                    <h2 className="text-xl font-semibold">{t('editFrontWatermark')}</h2>
+                    <h2 className="text-xl font-semibold">{t('editFrontImage')}</h2>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <RotateImageButton
                         direction="left"
@@ -1504,7 +1504,7 @@ export default function IDMarkingClient() {
                   <div className="relative">
                     <canvas
                       ref={frontEditCanvasRef}
-                      aria-label={t('editFrontWatermark')}
+                      aria-label={t('editFrontImage')}
                       aria-describedby="front-touch-hint"
                       className="block w-full rounded-lg touch-pan-y bg-white"
                       onMouseDown={(e) => handleStart(e, true)}
@@ -1622,7 +1622,7 @@ export default function IDMarkingClient() {
 
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <div className="mb-4">
-                    <h2 className="text-xl font-semibold">{t('editBackWatermark')}</h2>
+                    <h2 className="text-xl font-semibold">{t('editBackImage')}</h2>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <RotateImageButton
                         direction="left"
@@ -1673,7 +1673,7 @@ export default function IDMarkingClient() {
                   <div className="relative">
                     <canvas
                       ref={backEditCanvasRef}
-                      aria-label={t('editBackWatermark')}
+                      aria-label={t('editBackImage')}
                       aria-describedby="back-touch-hint"
                       className="block w-full rounded-lg touch-pan-y bg-white"
                       onMouseDown={(e) => handleStart(e, false)}
