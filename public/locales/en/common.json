@@ -17,6 +17,7 @@
   "editBackWatermark": "Edit Back Watermark",
   "rotateImageLeft": "Rotate {{side}} 90° left",
   "rotateImageRight": "Rotate {{side}} 90° right",
+  "pinchToZoom": "Pinch with two fingers to zoom in or out ({{scale}}%).",
   "uploadImageToEdit": "Upload an image to edit watermark",
   "downloadFront": "Download Front",
   "downloadBack": "Download Back",
@@ -38,5 +39,6 @@
   "privacyPointNoStorage": "No server image storage",
   "privacyUploadHint": "Stays on your device — never uploaded.",
   "clearImages": "Clear images",
-  "processingImage": "Processing locally…"
+  "processingImage": "Processing locally…",
+  "imageLoadError": "This image could not be opened. Please choose another file."
 }

@@ -1,6 +1,24 @@
 import { useTranslation } from 'next-i18next/pages';
 import { useRouter } from 'next/router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  clampImageScale,
+  createIdlePinchGestureState,
+  DEFAULT_IMAGE_SCALE,
+  endPinchGesture,
+  IMAGE_SCALE_STEP,
+  MAX_IMAGE_SCALE,
+  MIN_IMAGE_SCALE,
+  startPinchGesture,
+  updatePinchGesture,
+  type PinchGestureState,
+  type PinchSide,
+  type PinchTouch,
+} from '../lib/imageScale';
+import {
+  getCurrentImageLoadState,
+  type ImageLoadState,
+} from '../lib/imageLoadState';
 import {
   getNextImageRotationState,
   getRotatedImageDimensions,
@@ -59,7 +77,7 @@ const defaultSettings: ProcessingSettings = {
   rotation: -45,
   xPosition: 400,
   yPosition: 300,
-  imageScale: 1.0,  // 100%
+  imageScale: DEFAULT_IMAGE_SCALE,
   imageRotation: 0,
 };
 
@@ -104,14 +122,162 @@ function RotateImageButton({
   );
 }
 
+function useLoadedImage(file: File | null) {
+  const [loadState, setLoadState] = useState<ImageLoadState<File, HTMLImageElement> | null>(null);
+
+  useEffect(() => {
+    if (!file) return;
+
+    let cancelled = false;
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      image.onload = null;
+      image.onerror = null;
+
+      if (!cancelled) {
+        setLoadState({ file, image, hasError: false });
+      }
+    };
+    image.onerror = () => {
+      image.onload = null;
+      image.onerror = null;
+
+      if (!cancelled) {
+        setLoadState({ file, image: null, hasError: true });
+        console.error('Unable to decode the selected image');
+      }
+    };
+    image.src = objectUrl;
+
+    return () => {
+      cancelled = true;
+      image.onload = null;
+      image.onerror = null;
+      image.src = '';
+      URL.revokeObjectURL(objectUrl);
+      queueMicrotask(() => {
+        setLoadState(currentState => currentState?.file === file ? null : currentState);
+      });
+    };
+  }, [file]);
+
+  const currentLoadState = getCurrentImageLoadState(file, loadState);
+
+  return {
+    image: currentLoadState?.image ?? null,
+    isLoading: Boolean(file) && !currentLoadState,
+    hasError: currentLoadState?.hasError ?? false,
+  };
+}
+
+const getImageDimensions = (image: HTMLImageElement | null): ImageDimensions | null =>
+  image
+    ? {
+        width: image.naturalWidth || image.width,
+        height: image.naturalHeight || image.height,
+      }
+    : null;
+
+const getPinchTouches = (touches: React.TouchList): PinchTouch[] =>
+  Array.from(touches, touch => ({
+    identifier: touch.identifier,
+    x: touch.clientX,
+    y: touch.clientY,
+  }));
+
+const clearCanvas = (canvas: HTMLCanvasElement) => {
+  canvas.width = 300;
+  canvas.height = 150;
+  const ctx = canvas.getContext('2d');
+
+  if (ctx) {
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+};
+
+const processImage = (
+  canvas: HTMLCanvasElement,
+  image: HTMLImageElement,
+  settings: ProcessingSettings
+) => {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const imageRotation = normalizeRotation(settings.imageRotation);
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  const rotatedDimensions = getRotatedImageDimensions(
+    { width: sourceWidth, height: sourceHeight },
+    imageRotation
+  );
+
+  canvas.width = OUTPUT_CANVAS_WIDTH;
+  canvas.height = OUTPUT_CANVAS_WIDTH * (rotatedDimensions.height / rotatedDimensions.width);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const baseScale = canvas.width / rotatedDimensions.width;
+  const width = sourceWidth * baseScale * settings.imageScale;
+  const height = sourceHeight * baseScale * settings.imageScale;
+
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate((imageRotation * Math.PI) / 180);
+  ctx.drawImage(image, -width / 2, -height / 2, width, height);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(settings.xPosition, settings.yPosition);
+  ctx.rotate((settings.rotation * Math.PI) / 180);
+  ctx.font = `${settings.textSize}px "Outfit"`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const textMetrics = ctx.measureText(settings.text);
+  const textWidth = textMetrics.width;
+  const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
+  const lineExtension = 50;
+  const lineSpacing = textHeight * 1.2;
+  const lineStart = -textWidth / 2 - lineExtension;
+  const lineEnd = textWidth / 2 + lineExtension;
+
+  ctx.beginPath();
+  ctx.lineWidth = settings.lineWidth;
+  ctx.strokeStyle = settings.color;
+  ctx.moveTo(lineStart, -lineSpacing);
+  ctx.lineTo(lineEnd, -lineSpacing);
+  ctx.stroke();
+  ctx.moveTo(lineStart, lineSpacing);
+  ctx.lineTo(lineEnd, lineSpacing);
+  ctx.stroke();
+
+  ctx.fillStyle = settings.color;
+  ctx.fillText(settings.text, 0, 0);
+  ctx.restore();
+};
+
 export default function IDMarkingClient() {
   const { t, i18n } = useTranslation('common');
   const router = useRouter();
   const initialWatermarkText = getDefaultText(t('defaultWatermarkText'));
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
-  const [frontImageDimensions, setFrontImageDimensions] = useState<ImageDimensions | null>(null);
-  const [backImageDimensions, setBackImageDimensions] = useState<ImageDimensions | null>(null);
+  const {
+    image: frontLoadedImage,
+    isLoading: isFrontImageLoading,
+    hasError: hasFrontImageError,
+  } = useLoadedImage(frontImage);
+  const {
+    image: backLoadedImage,
+    isLoading: isBackImageLoading,
+    hasError: hasBackImageError,
+  } = useLoadedImage(backImage);
+  const frontImageDimensions = getImageDimensions(frontLoadedImage);
+  const backImageDimensions = getImageDimensions(backLoadedImage);
   const [frontSettings, setFrontSettings] = useState<ProcessingSettings>(() => ({
     ...defaultSettings,
     text: initialWatermarkText,
@@ -138,6 +304,7 @@ export default function IDMarkingClient() {
     startSize: 0,
     type: null,
   });
+  const pinchStateRef = useRef<PinchGestureState>(createIdlePinchGestureState());
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
   useEffect(() => {
@@ -177,8 +344,37 @@ export default function IDMarkingClient() {
     };
   }, [i18n, router]);
 
+  const resetDragState = () => {
+    dragStateRef.current.isDragging = false;
+    dragStateRef.current.type = null;
+  };
+
+  const resetPinchState = () => {
+    pinchStateRef.current = createIdlePinchGestureState();
+  };
+
+  const beginPinch = (
+    touches: React.TouchList,
+    isFront: boolean,
+    startScale: number
+  ) => {
+    if (touches.length < 2) return false;
+
+    const side: PinchSide = isFront ? 'front' : 'back';
+    pinchStateRef.current = startPinchGesture(
+      getPinchTouches(touches),
+      side,
+      startScale
+    );
+
+    return true;
+  };
+
   const handleImageUpload = async (file: File, isFront: boolean) => {
     if (!file || !isSupportedImage(file)) return;
+
+    resetDragState();
+    resetPinchState();
 
     const uploadGenerationRef = isFront ? frontUploadGenerationRef : backUploadGenerationRef;
     const setIsProcessing = isFront ? setIsProcessingFront : setIsProcessingBack;
@@ -203,18 +399,18 @@ export default function IDMarkingClient() {
       if (uploadGenerationRef.current !== requestId) return;
 
       if (isFront) {
-        setFrontImageDimensions(null);
         setFrontSettings(prev => ({
           ...prev,
+          imageScale: DEFAULT_IMAGE_SCALE,
           imageRotation: 0,
           xPosition: defaultSettings.xPosition,
           yPosition: defaultSettings.yPosition,
         }));
         setFrontImage(imageFile);
       } else {
-        setBackImageDimensions(null);
         setBackSettings(prev => ({
           ...prev,
+          imageScale: DEFAULT_IMAGE_SCALE,
           imageRotation: 0,
           xPosition: defaultSettings.xPosition,
           yPosition: defaultSettings.yPosition,
@@ -241,21 +437,23 @@ export default function IDMarkingClient() {
     backUploadGenerationRef.current += 1;
     setFrontImage(null);
     setBackImage(null);
-    setFrontImageDimensions(null);
-    setBackImageDimensions(null);
     setIsDraggingFront(false);
     setIsDraggingBack(false);
     setIsProcessingFront(false);
     setIsProcessingBack(false);
     setDebugInfo([]);
+    resetDragState();
+    resetPinchState();
     setFrontSettings(prev => ({
       ...prev,
+      imageScale: DEFAULT_IMAGE_SCALE,
       imageRotation: 0,
       xPosition: defaultSettings.xPosition,
       yPosition: defaultSettings.yPosition,
     }));
     setBackSettings(prev => ({
       ...prev,
+      imageScale: DEFAULT_IMAGE_SCALE,
       imageRotation: 0,
       xPosition: defaultSettings.xPosition,
       yPosition: defaultSettings.yPosition,
@@ -314,6 +512,8 @@ export default function IDMarkingClient() {
     const canvas = isFront ? frontEditCanvasRef.current : backEditCanvasRef.current;
     const settings = isFront ? frontSettings : backSettings;
     if (!canvas) return;
+
+    resetDragState();
 
     const { x, y } = getCanvasPosition(e, canvas);
 
@@ -426,7 +626,7 @@ export default function IDMarkingClient() {
       return;
     }
 
-    if (dragStateRef.current.type === 'move') {
+    if (dragStateRef.current.isDragging && dragStateRef.current.type === 'move') {
       const dx = x - dragStateRef.current.startX;
       const dy = y - dragStateRef.current.startY;
       setSettings((prev) => ({
@@ -440,7 +640,96 @@ export default function IDMarkingClient() {
   };
 
   const handleEnd = () => {
-    dragStateRef.current.isDragging = false;
+    resetDragState();
+  };
+
+  const handleTouchStart = (
+    e: React.TouchEvent<HTMLCanvasElement>,
+    isFront: boolean
+  ) => {
+    const side: PinchSide = isFront ? 'front' : 'back';
+
+    if (e.targetTouches.length >= 2) {
+      e.preventDefault();
+      const settings = isFront ? frontSettings : backSettings;
+      const activePinch = pinchStateRef.current;
+      const startScale = activePinch.isPinching && activePinch.side === side
+        ? activePinch.currentScale
+        : settings.imageScale;
+
+      resetDragState();
+      beginPinch(e.targetTouches, isFront, startScale);
+      return;
+    }
+
+    resetPinchState();
+    handleStart(e, isFront);
+  };
+
+  const handleTouchMove = (
+    e: React.TouchEvent<HTMLCanvasElement>,
+    isFront: boolean
+  ) => {
+    const pinchState = pinchStateRef.current;
+    const side: PinchSide = isFront ? 'front' : 'back';
+
+    if (pinchState.isPinching && pinchState.side === side) {
+      e.preventDefault();
+
+      const pinchUpdate = updatePinchGesture(
+        pinchState,
+        getPinchTouches(e.targetTouches),
+        side
+      );
+      pinchStateRef.current = pinchUpdate.state;
+      const imageScale = pinchUpdate.imageScale;
+
+      if (imageScale !== null) {
+        const setSettings = isFront ? setFrontSettings : setBackSettings;
+        setSettings(prev => prev.imageScale === imageScale
+          ? prev
+          : { ...prev, imageScale });
+      }
+      return;
+    }
+
+    if (e.targetTouches.length >= 2) {
+      e.preventDefault();
+      const settings = isFront ? frontSettings : backSettings;
+      resetDragState();
+      beginPinch(e.targetTouches, isFront, settings.imageScale);
+      return;
+    }
+
+    if (e.targetTouches.length === 1) {
+      handleMove(e, isFront);
+    }
+  };
+
+  const handleTouchEnd = (
+    e: React.TouchEvent<HTMLCanvasElement>,
+    isFront: boolean
+  ) => {
+    const pinchState = pinchStateRef.current;
+    const side: PinchSide = isFront ? 'front' : 'back';
+
+    if (pinchState.isPinching && pinchState.side === side) {
+      pinchStateRef.current = endPinchGesture(
+        pinchState,
+        getPinchTouches(e.targetTouches),
+        side
+      );
+      resetDragState();
+      return;
+    }
+
+    resetPinchState();
+    resetDragState();
+  };
+
+  const handleTouchCancel = () => {
+    resetPinchState();
+    resetDragState();
   };
 
   const handleDownload = (canvas: HTMLCanvasElement, suffix: string) => {
@@ -517,174 +806,21 @@ export default function IDMarkingClient() {
     handleDownload(canvas, 'combined');
   };
 
-  const processImage = (
-    canvas: HTMLCanvasElement,
-    image: HTMLImageElement,
-    settings: ProcessingSettings,
-    showControls = false
-  ) => {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const imageRotation = normalizeRotation(settings.imageRotation);
-    const sourceWidth = image.naturalWidth || image.width;
-    const sourceHeight = image.naturalHeight || image.height;
-    const rotatedDimensions = getRotatedImageDimensions(
-      { width: sourceWidth, height: sourceHeight },
-      imageRotation
-    );
-
-    // Set canvas dimensions based on the rotated image orientation.
-    canvas.width = OUTPUT_CANVAS_WIDTH;
-    canvas.height = OUTPUT_CANVAS_WIDTH * (rotatedDimensions.height / rotatedDimensions.width);
-
-    // Clear canvas
-    ctx.fillStyle = '#FFFFFF'; // White background
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw the scaled image around the canvas center so quarter turns remain uncropped.
-    const baseScale = canvas.width / rotatedDimensions.width;
-    const width = sourceWidth * baseScale * settings.imageScale;
-    const height = sourceHeight * baseScale * settings.imageScale;
-
-    ctx.save();
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate((imageRotation * Math.PI) / 180);
-    ctx.drawImage(image, -width / 2, -height / 2, width, height);
-    ctx.restore();
-
-    // Save context state
-    ctx.save();
-
-    // Transform context for rotated text and lines
-    ctx.translate(settings.xPosition, settings.yPosition);
-    ctx.rotate((settings.rotation * Math.PI) / 180);
-
-    // Set up text properties
-    ctx.font = `${settings.textSize}px "Outfit"`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // Measure text to position lines
-    const textMetrics = ctx.measureText(settings.text);
-    const textWidth = textMetrics.width;
-    const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
-    const lineExtension = 50; // Extra length beyond text on each side
-    const lineSpacing = textHeight * 1.2; // Space between text and lines
-    const lineStart = -textWidth / 2 - lineExtension;
-    const lineEnd = textWidth / 2 + lineExtension;
-
-    // Draw lines
-    ctx.beginPath();
-    ctx.lineWidth = settings.lineWidth;
-    ctx.strokeStyle = settings.color;
-
-    // First line (top)
-    ctx.moveTo(lineStart, -lineSpacing);
-    ctx.lineTo(lineEnd, -lineSpacing);
-    ctx.stroke();
-
-    // Second line (bottom)
-    ctx.moveTo(lineStart, lineSpacing);
-    ctx.lineTo(lineEnd, lineSpacing);
-    ctx.stroke();
-
-    // Draw text
-    ctx.fillStyle = settings.color;
-    ctx.fillText(settings.text, 0, 0);
-
-    // Restore context state
-    ctx.restore();
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    const objectUrls = new Set<string>();
-    const cancelImageLoads = new Set<() => void>();
-
-    const updateCanvas = async (
-      image: File,
-      editCanvas: HTMLCanvasElement | null,
-      settings: ProcessingSettings,
-      setImageDimensions: (dimensions: ImageDimensions) => void
-    ) => {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(image);
-      objectUrls.add(objectUrl);
-
-      try {
-        await new Promise<void>((resolve, reject) => {
-          const clearHandlers = () => {
-            img.onload = null;
-            img.onerror = null;
-          };
-          const cancelLoad = () => {
-            clearHandlers();
-            img.src = '';
-            reject(new DOMException('Image load cancelled', 'AbortError'));
-          };
-
-          cancelImageLoads.add(cancelLoad);
-          img.onload = () => {
-            cancelImageLoads.delete(cancelLoad);
-            clearHandlers();
-            resolve();
-          };
-          img.onerror = () => {
-            cancelImageLoads.delete(cancelLoad);
-            clearHandlers();
-            reject(new Error('Unable to decode the selected image'));
-          };
-          img.src = objectUrl;
-        });
-
-        if (!cancelled) {
-          setImageDimensions({
-            width: img.naturalWidth || img.width,
-            height: img.naturalHeight || img.height,
-          });
-
-          if (editCanvas) {
-            processImage(editCanvas, img, settings, true);
-          }
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error('Error loading image:', error);
-        }
-      } finally {
-        if (objectUrls.delete(objectUrl)) {
-          URL.revokeObjectURL(objectUrl);
-        }
-      }
-    };
-
-    if (frontImage) {
-      updateCanvas(
-        frontImage,
-        frontEditCanvasRef.current,
-        frontSettings,
-        setFrontImageDimensions
-      );
+  useLayoutEffect(() => {
+    if (frontLoadedImage && frontEditCanvasRef.current) {
+      processImage(frontEditCanvasRef.current, frontLoadedImage, frontSettings);
+    } else if (frontImage && frontEditCanvasRef.current) {
+      clearCanvas(frontEditCanvasRef.current);
     }
+  }, [frontImage, frontLoadedImage, frontSettings]);
 
-    if (backImage) {
-      updateCanvas(
-        backImage,
-        backEditCanvasRef.current,
-        backSettings,
-        setBackImageDimensions
-      );
+  useLayoutEffect(() => {
+    if (backLoadedImage && backEditCanvasRef.current) {
+      processImage(backEditCanvasRef.current, backLoadedImage, backSettings);
+    } else if (backImage && backEditCanvasRef.current) {
+      clearCanvas(backEditCanvasRef.current);
     }
-
-    return () => {
-      cancelled = true;
-      cancelImageLoads.forEach((cancelLoad) => cancelLoad());
-      cancelImageLoads.clear();
-      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
-      objectUrls.clear();
-    };
-  }, [frontImage, backImage, frontSettings, backSettings]);
+  }, [backImage, backLoadedImage, backSettings]);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, isFront: boolean) => {
     e.preventDefault();
@@ -812,11 +948,14 @@ export default function IDMarkingClient() {
                     </label>
                     <input
                       type="range"
-                      min="0.5"
-                      max="1.0"
-                      step="0.05"
+                      min={MIN_IMAGE_SCALE}
+                      max={MAX_IMAGE_SCALE}
+                      step={IMAGE_SCALE_STEP}
                       value={frontSettings.imageScale}
-                      onChange={(e) => setFrontSettings({ ...frontSettings, imageScale: parseFloat(e.target.value) })}
+                      onChange={(e) => setFrontSettings({
+                        ...frontSettings,
+                        imageScale: clampImageScale(parseFloat(e.target.value)),
+                      })}
                       className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mb-4"
                     />
                   </div>
@@ -869,9 +1008,9 @@ export default function IDMarkingClient() {
                 </div>
 
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
-                  <div className="mb-4 flex items-center gap-2">
+                  <div className="mb-4">
                     <h2 className="text-xl font-semibold">{t('editFrontWatermark')}</h2>
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="mt-3 flex items-center gap-1">
                       <RotateImageButton
                         direction="left"
                         disabled={!frontImageDimensions || isProcessingFront}
@@ -885,29 +1024,39 @@ export default function IDMarkingClient() {
                         onClick={() => handleRotateImage(true, 'right')}
                       />
                     </div>
+                    <p id="front-pinch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
+                      {t('pinchToZoom', { scale: (frontSettings.imageScale * 100).toFixed(0) })}
+                    </p>
                   </div>
                   <div className="relative">
                     <canvas
                       ref={frontEditCanvasRef}
+                      aria-label={t('editFrontWatermark')}
+                      aria-describedby="front-pinch-hint"
                       className="w-full rounded-lg touch-none bg-white"
                       onMouseDown={(e) => handleStart(e, true)}
                       onMouseMove={(e) => handleMove(e, true)}
                       onMouseUp={handleEnd}
                       onMouseLeave={handleEnd}
-                      onTouchStart={(e) => handleStart(e, true)}
-                      onTouchMove={(e) => handleMove(e, true)}
-                      onTouchEnd={handleEnd}
+                      onTouchStart={(e) => handleTouchStart(e, true)}
+                      onTouchMove={(e) => handleTouchMove(e, true)}
+                      onTouchEnd={(e) => handleTouchEnd(e, true)}
+                      onTouchCancel={handleTouchCancel}
                     />
-                    {!frontImage && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <p className="text-gray-400">{t('uploadImageToEdit')}</p>
+                    {(isFrontImageLoading || hasFrontImageError) && (
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/90 px-4 text-center">
+                        <p className="text-sm text-gray-700">
+                          {hasFrontImageError ? t('imageLoadError') : t('processingImage')}
+                        </p>
                       </div>
                     )}
                   </div>
                   <div className="flex justify-center mt-4">
                     <button
-                      onClick={() => frontEditCanvasRef.current && handleDownload(frontEditCanvasRef.current, 'front')}
-                      className="px-4 py-2 bg-gray-800 text-white rounded-sm hover:bg-gray-700 border border-gray-600"
+                      type="button"
+                      disabled={!frontLoadedImage}
+                      onClick={() => frontLoadedImage && frontEditCanvasRef.current && handleDownload(frontEditCanvasRef.current, 'front')}
+                      className="px-4 py-2 bg-gray-800 text-white rounded-sm hover:bg-gray-700 border border-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {t('downloadFront')}
                     </button>
@@ -959,11 +1108,14 @@ export default function IDMarkingClient() {
                     </label>
                     <input
                       type="range"
-                      min="0.5"
-                      max="1.0"
-                      step="0.05"
+                      min={MIN_IMAGE_SCALE}
+                      max={MAX_IMAGE_SCALE}
+                      step={IMAGE_SCALE_STEP}
                       value={backSettings.imageScale}
-                      onChange={(e) => setBackSettings({ ...backSettings, imageScale: parseFloat(e.target.value) })}
+                      onChange={(e) => setBackSettings({
+                        ...backSettings,
+                        imageScale: clampImageScale(parseFloat(e.target.value)),
+                      })}
                       className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mb-4"
                     />
                   </div>
@@ -1016,9 +1168,9 @@ export default function IDMarkingClient() {
                 </div>
 
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
-                  <div className="mb-4 flex items-center gap-2">
+                  <div className="mb-4">
                     <h2 className="text-xl font-semibold">{t('editBackWatermark')}</h2>
-                    <div className="flex shrink-0 items-center gap-1">
+                    <div className="mt-3 flex items-center gap-1">
                       <RotateImageButton
                         direction="left"
                         disabled={!backImageDimensions || isProcessingBack}
@@ -1032,29 +1184,39 @@ export default function IDMarkingClient() {
                         onClick={() => handleRotateImage(false, 'right')}
                       />
                     </div>
+                    <p id="back-pinch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
+                      {t('pinchToZoom', { scale: (backSettings.imageScale * 100).toFixed(0) })}
+                    </p>
                   </div>
                   <div className="relative">
                     <canvas
                       ref={backEditCanvasRef}
+                      aria-label={t('editBackWatermark')}
+                      aria-describedby="back-pinch-hint"
                       className="w-full rounded-lg touch-none bg-white"
                       onMouseDown={(e) => handleStart(e, false)}
                       onMouseMove={(e) => handleMove(e, false)}
                       onMouseUp={handleEnd}
                       onMouseLeave={handleEnd}
-                      onTouchStart={(e) => handleStart(e, false)}
-                      onTouchMove={(e) => handleMove(e, false)}
-                      onTouchEnd={handleEnd}
+                      onTouchStart={(e) => handleTouchStart(e, false)}
+                      onTouchMove={(e) => handleTouchMove(e, false)}
+                      onTouchEnd={(e) => handleTouchEnd(e, false)}
+                      onTouchCancel={handleTouchCancel}
                     />
-                    {!backImage && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <p className="text-gray-400">{t('uploadImageToEdit')}</p>
+                    {(isBackImageLoading || hasBackImageError) && (
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/90 px-4 text-center">
+                        <p className="text-sm text-gray-700">
+                          {hasBackImageError ? t('imageLoadError') : t('processingImage')}
+                        </p>
                       </div>
                     )}
                   </div>
                   <div className="flex justify-center mt-4">
                     <button
-                      onClick={() => backEditCanvasRef.current && handleDownload(backEditCanvasRef.current, 'back')}
-                      className="px-4 py-2 bg-gray-800 text-white rounded-sm hover:bg-gray-700 border border-gray-600"
+                      type="button"
+                      disabled={!backLoadedImage}
+                      onClick={() => backLoadedImage && backEditCanvasRef.current && handleDownload(backEditCanvasRef.current, 'back')}
+                      className="px-4 py-2 bg-gray-800 text-white rounded-sm hover:bg-gray-700 border border-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {t('downloadBack')}
                     </button>
@@ -1066,7 +1228,7 @@ export default function IDMarkingClient() {
         </div>
 
         {/* Combined Download Button */}
-        {frontImage && backImage && (
+        {frontLoadedImage && backLoadedImage && (
           <div className="text-center mt-8">
             <button
               onClick={handleCombinedDownload}

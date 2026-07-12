@@ -17,6 +17,7 @@
   "editBackWatermark": "Edit Tanda Air Belakang",
   "rotateImageLeft": "Putar {{side}} 90° ke kiri",
   "rotateImageRight": "Putar {{side}} 90° ke kanan",
+  "pinchToZoom": "Cubit dengan dua jari untuk zum masuk atau keluar ({{scale}}%).",
   "uploadImageToEdit": "Muat naik imej untuk mengedit tanda air",
   "downloadFront": "Muat Turun Hadapan",
   "downloadBack": "Muat Turun Belakang",
@@ -38,5 +39,6 @@
   "privacyPointNoStorage": "Imej tidak disimpan pada pelayan",
   "privacyUploadHint": "Kekal pada peranti anda — tidak pernah dimuat naik.",
   "clearImages": "Kosongkan imej",
-  "processingImage": "Sedang diproses secara setempat…"
+  "processingImage": "Sedang diproses secara setempat…",
+  "imageLoadError": "Imej ini tidak dapat dibuka. Sila pilih fail lain."
 }
