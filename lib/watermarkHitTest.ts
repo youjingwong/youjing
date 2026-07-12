@@ -127,6 +127,12 @@ export const shouldStartWatermarkTransform = (
 
 export const MIN_WATERMARK_TEXT_SIZE = 12;
 export const MAX_WATERMARK_TEXT_SIZE = 200;
+export const WATERMARK_ROTATION_SNAP_ANGLES = [-90, -45, 0, 45, 90] as const;
+export const WATERMARK_ROTATION_SNAP_ENTER_THRESHOLD = 4;
+export const WATERMARK_ROTATION_SNAP_RELEASE_THRESHOLD = 8;
+
+export type WatermarkRotationSnapAngle =
+  (typeof WATERMARK_ROTATION_SNAP_ANGLES)[number];
 
 export interface WatermarkTransformTouch extends WatermarkPoint {
   identifier: number;
@@ -140,12 +146,60 @@ export interface WatermarkTransformState {
   lastAngle: number;
   currentTextSize: number;
   currentRotation: number;
+  unsnappedRotation: number;
+  snappedRotation: WatermarkRotationSnapAngle | null;
 }
 
 export const normalizeWatermarkRotation = (rotation: number) => {
   if (!Number.isFinite(rotation)) return 0;
 
   return ((rotation + 180) % 360 + 360) % 360 - 180;
+};
+
+const getWatermarkRotationDistance = (rotation: number, target: number) =>
+  Math.abs(normalizeWatermarkRotation(rotation - target));
+
+export const resolveWatermarkRotationSnap = (
+  unsnappedRotation: number,
+  snappedRotation: WatermarkRotationSnapAngle | null
+): {
+  rotation: number;
+  snappedRotation: WatermarkRotationSnapAngle | null;
+} => {
+  const rotation = normalizeWatermarkRotation(unsnappedRotation);
+
+  if (
+    snappedRotation !== null &&
+    getWatermarkRotationDistance(rotation, snappedRotation) <=
+      WATERMARK_ROTATION_SNAP_RELEASE_THRESHOLD
+  ) {
+    return { rotation: snappedRotation, snappedRotation };
+  }
+
+  const nearestSnap = WATERMARK_ROTATION_SNAP_ANGLES.reduce<{
+    angle: WatermarkRotationSnapAngle;
+    distance: number;
+  } | null>((nearest, angle) => {
+    const distance = getWatermarkRotationDistance(rotation, angle);
+
+    if (!nearest || distance < nearest.distance) {
+      return { angle, distance };
+    }
+
+    return nearest;
+  }, null);
+
+  if (
+    nearestSnap &&
+    nearestSnap.distance <= WATERMARK_ROTATION_SNAP_ENTER_THRESHOLD
+  ) {
+    return {
+      rotation: nearestSnap.angle,
+      snappedRotation: nearestSnap.angle,
+    };
+  }
+
+  return { rotation, snappedRotation: null };
 };
 
 export const getWatermarkTouchAngle = (
@@ -181,6 +235,8 @@ export const createIdleWatermarkTransformState = (): WatermarkTransformState => 
   lastAngle: 0,
   currentTextSize: MIN_WATERMARK_TEXT_SIZE,
   currentRotation: 0,
+  unsnappedRotation: 0,
+  snappedRotation: null,
 });
 
 export const startWatermarkTransform = (
@@ -195,6 +251,7 @@ export const startWatermarkTransform = (
   const secondTouch = touches[1];
   const safeTextSize = clampWatermarkTextSize(textSize);
   const safeRotation = normalizeWatermarkRotation(rotation);
+  const initialSnap = resolveWatermarkRotationSnap(safeRotation, null);
 
   return {
     isTransforming: true,
@@ -203,7 +260,29 @@ export const startWatermarkTransform = (
     lastDistance: getWatermarkTouchDistance(firstTouch, secondTouch),
     lastAngle: getWatermarkTouchAngle(firstTouch, secondTouch),
     currentTextSize: safeTextSize,
-    currentRotation: safeRotation,
+    currentRotation: initialSnap.rotation,
+    unsnappedRotation: safeRotation,
+    snappedRotation: initialSnap.snappedRotation,
+  };
+};
+
+const rebaselineWatermarkTransform = (
+  state: WatermarkTransformState,
+  touches: readonly WatermarkTransformTouch[],
+  side: WatermarkDragSide
+): WatermarkTransformState => {
+  if (touches.length < 2) return createIdleWatermarkTransformState();
+
+  const firstTouch = touches[0];
+  const secondTouch = touches[1];
+
+  return {
+    ...state,
+    isTransforming: true,
+    side,
+    touchIdentifiers: [firstTouch.identifier, secondTouch.identifier],
+    lastDistance: getWatermarkTouchDistance(firstTouch, secondTouch),
+    lastAngle: getWatermarkTouchAngle(firstTouch, secondTouch),
   };
 };
 
@@ -234,12 +313,7 @@ export const updateWatermarkTransform = (
 
   if (!firstTouch || !secondTouch) {
     return {
-      state: startWatermarkTransform(
-        touches,
-        side,
-        state.currentTextSize,
-        state.currentRotation
-      ),
+      state: rebaselineWatermarkTransform(state, touches, side),
       textSize: null,
       rotation: null,
     };
@@ -267,11 +341,15 @@ export const updateWatermarkTransform = (
   const scale = currentDistance / state.lastDistance;
   const nextTextSize = clampWatermarkTextSize(state.currentTextSize * scale);
   const angleDelta = normalizeWatermarkRotation(currentAngle - state.lastAngle);
-  const nextRotation = normalizeWatermarkRotation(
-    state.currentRotation + angleDelta
+  const nextUnsnappedRotation = normalizeWatermarkRotation(
+    state.unsnappedRotation + angleDelta
+  );
+  const rotationSnap = resolveWatermarkRotationSnap(
+    nextUnsnappedRotation,
+    state.snappedRotation
   );
   const textSize = Math.round(nextTextSize);
-  const rotation = Math.round(nextRotation);
+  const rotation = Math.round(rotationSnap.rotation);
 
   return {
     state: {
@@ -279,7 +357,9 @@ export const updateWatermarkTransform = (
       lastDistance: currentDistance,
       lastAngle: currentAngle,
       currentTextSize: nextTextSize,
-      currentRotation: nextRotation,
+      currentRotation: rotationSnap.rotation,
+      unsnappedRotation: nextUnsnappedRotation,
+      snappedRotation: rotationSnap.snappedRotation,
     },
     textSize,
     rotation,
@@ -296,12 +376,7 @@ export const endWatermarkTransform = (
     state.side === side &&
     remainingTouches.length >= 2
   ) {
-    return startWatermarkTransform(
-      remainingTouches,
-      side,
-      state.currentTextSize,
-      state.currentRotation
-    );
+    return rebaselineWatermarkTransform(state, remainingTouches, side);
   }
 
   return createIdleWatermarkTransformState();

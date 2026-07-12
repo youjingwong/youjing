@@ -43,6 +43,13 @@ import {
   type WatermarkDragState,
   type WatermarkTransformState,
 } from '../lib/watermarkHitTest';
+import {
+  DEFAULT_WATERMARK_ROTATION,
+  DEFAULT_WATERMARK_TEXT_SIZE,
+  DEFAULT_WATERMARK_X_POSITION,
+  DEFAULT_WATERMARK_Y_POSITION,
+  resetWatermarkTransform,
+} from '../lib/watermarkSettings';
 import LanguageSwitcher from './LanguageSwitcher';
 
 interface ProcessingSettings {
@@ -92,10 +99,10 @@ const defaultSettings: ProcessingSettings = {
   text: 'FOR PRIVATE USE ONLY',
   color: '#000000',
   lineWidth: 5,
-  textSize: 48,
-  rotation: -45,
-  xPosition: 400,
-  yPosition: 300,
+  textSize: DEFAULT_WATERMARK_TEXT_SIZE,
+  rotation: DEFAULT_WATERMARK_ROTATION,
+  xPosition: DEFAULT_WATERMARK_X_POSITION,
+  yPosition: DEFAULT_WATERMARK_Y_POSITION,
   imageScale: DEFAULT_IMAGE_SCALE,
   imageRotation: 0,
 };
@@ -122,7 +129,7 @@ function RotateImageButton({
       disabled={disabled}
       aria-label={label}
       title={label}
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-gray-700 bg-gray-800 text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8"
+      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-gray-700 bg-gray-800 text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8"
     >
       <svg
         aria-hidden="true"
@@ -137,6 +144,46 @@ function RotateImageButton({
         <path d={isLeft ? 'M3 12a9 9 0 1 0 2.64-6.36L3 8' : 'M21 12a9 9 0 1 1-2.64-6.36L21 8'} />
         <path d={isLeft ? 'M3 3v5h5' : 'M21 3v5h-5'} />
       </svg>
+    </button>
+  );
+}
+
+interface ResetWatermarkButtonProps {
+  disabled: boolean;
+  label: string;
+  description: string;
+  onClick: () => void;
+}
+
+function ResetWatermarkButton({
+  disabled,
+  label,
+  description,
+  onClick,
+}: ResetWatermarkButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={description}
+      title={description}
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 text-sm text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-8"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4"
+      >
+        <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+        <path d="M3 3v5h5" />
+      </svg>
+      <span>{label}</span>
     </button>
   );
 }
@@ -217,6 +264,40 @@ const clearCanvas = (canvas: HTMLCanvasElement) => {
   }
 };
 
+interface WatermarkLayout {
+  textWidth: number;
+  textHeight: number;
+  lineExtension: number;
+  lineSpacing: number;
+  hitboxWidth: number;
+  hitboxHeight: number;
+}
+
+const getWatermarkLayout = (
+  ctx: CanvasRenderingContext2D,
+  settings: Pick<ProcessingSettings, 'text' | 'textSize'>
+): WatermarkLayout => {
+  ctx.save();
+  ctx.font = `${settings.textSize}px "Outfit"`;
+  const textMetrics = ctx.measureText(settings.text);
+  const textWidth = textMetrics.width;
+  const textHeight =
+    textMetrics.actualBoundingBoxAscent +
+    textMetrics.actualBoundingBoxDescent;
+  const lineExtension = 50;
+  const lineSpacing = textHeight * 1.2;
+  ctx.restore();
+
+  return {
+    textWidth,
+    textHeight,
+    lineExtension,
+    lineSpacing,
+    hitboxWidth: textWidth + (lineExtension * 2),
+    hitboxHeight: (lineSpacing * 2) + textHeight,
+  };
+};
+
 const processImage = (
   canvas: HTMLCanvasElement,
   image: HTMLImageElement,
@@ -256,11 +337,11 @@ const processImage = (
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  const textMetrics = ctx.measureText(settings.text);
-  const textWidth = textMetrics.width;
-  const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
-  const lineExtension = 50;
-  const lineSpacing = textHeight * 1.2;
+  const {
+    textWidth,
+    lineExtension,
+    lineSpacing,
+  } = getWatermarkLayout(ctx, settings);
   const lineStart = -textWidth / 2 - lineExtension;
   const lineEnd = textWidth / 2 + lineExtension;
 
@@ -276,6 +357,44 @@ const processImage = (
 
   ctx.fillStyle = settings.color;
   ctx.fillText(settings.text, 0, 0);
+  ctx.restore();
+};
+
+const drawWatermarkSelection = (
+  overlayCanvas: HTMLCanvasElement,
+  sourceCanvas: HTMLCanvasElement,
+  settings: ProcessingSettings,
+  isVisible: boolean
+) => {
+  if (
+    overlayCanvas.width !== sourceCanvas.width ||
+    overlayCanvas.height !== sourceCanvas.height
+  ) {
+    overlayCanvas.width = sourceCanvas.width;
+    overlayCanvas.height = sourceCanvas.height;
+  }
+
+  const ctx = overlayCanvas.getContext('2d');
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  if (!isVisible) return;
+
+  const { hitboxWidth, hitboxHeight } = getWatermarkLayout(ctx, settings);
+  const padding = 8;
+
+  ctx.save();
+  ctx.translate(settings.xPosition, settings.yPosition);
+  ctx.rotate((settings.rotation * Math.PI) / 180);
+  ctx.setLineDash([12, 8]);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = 'rgba(96, 165, 250, 0.85)';
+  ctx.strokeRect(
+    -(hitboxWidth / 2) - padding,
+    -(hitboxHeight / 2) - padding,
+    hitboxWidth + (padding * 2),
+    hitboxHeight + (padding * 2)
+  );
   ctx.restore();
 };
 
@@ -307,6 +426,8 @@ export default function IDMarkingClient() {
   }));
   const frontEditCanvasRef = useRef<HTMLCanvasElement>(null);
   const backEditCanvasRef = useRef<HTMLCanvasElement>(null);
+  const frontSelectionCanvasRef = useRef<HTMLCanvasElement>(null);
+  const backSelectionCanvasRef = useRef<HTMLCanvasElement>(null);
   const frontFileInputRef = useRef<HTMLInputElement>(null);
   const backFileInputRef = useRef<HTMLInputElement>(null);
   const frontTouchHandlersRef = useRef<CanvasTouchHandlers | null>(null);
@@ -319,6 +440,8 @@ export default function IDMarkingClient() {
   const [isProcessingBack, setIsProcessingBack] = useState<boolean>(false);
   const dragStateRef = useRef<WatermarkDragState>(createIdleWatermarkDragState());
   const multiTouchGestureRef = useRef<MultiTouchGesture>({ kind: 'idle' });
+  const [activeWatermarkSide, setActiveWatermarkSide] =
+    useState<WatermarkDragSide | null>(null);
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
   useEffect(() => {
@@ -378,6 +501,7 @@ export default function IDMarkingClient() {
       kind: 'image',
       state: startPinchGesture(getPinchTouches(touches), side, startScale),
     };
+    setActiveWatermarkSide(null);
 
     return true;
   };
@@ -416,6 +540,7 @@ export default function IDMarkingClient() {
         rotation
       ),
     };
+    setActiveWatermarkSide(side);
 
     return true;
   };
@@ -425,6 +550,7 @@ export default function IDMarkingClient() {
 
     resetDragState();
     resetMultiTouchGesture();
+    setActiveWatermarkSide(null);
 
     const uploadGenerationRef = isFront ? frontUploadGenerationRef : backUploadGenerationRef;
     const setIsProcessing = isFront ? setIsProcessingFront : setIsProcessingBack;
@@ -494,6 +620,7 @@ export default function IDMarkingClient() {
     setDebugInfo([]);
     resetDragState();
     resetMultiTouchGesture();
+    setActiveWatermarkSide(null);
     setFrontSettings(prev => ({
       ...prev,
       imageScale: DEFAULT_IMAGE_SCALE,
@@ -523,6 +650,10 @@ export default function IDMarkingClient() {
 
     if (!imageDimensions) return;
 
+    resetDragState();
+    resetMultiTouchGesture();
+    setActiveWatermarkSide(null);
+
     setSettings(prev => ({
       ...prev,
       ...getNextImageRotationState(
@@ -532,6 +663,20 @@ export default function IDMarkingClient() {
         direction
       ),
     }));
+  };
+
+  const handleResetWatermark = (isFront: boolean) => {
+    const imageDimensions = isFront
+      ? frontImageDimensions
+      : backImageDimensions;
+    const setSettings = isFront ? setFrontSettings : setBackSettings;
+
+    if (!imageDimensions) return;
+
+    resetDragState();
+    resetMultiTouchGesture();
+    setActiveWatermarkSide(null);
+    setSettings(prev => resetWatermarkTransform(prev, imageDimensions));
   };
 
   const getCanvasPointer = (
@@ -591,18 +736,7 @@ export default function IDMarkingClient() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.save();
-    ctx.font = `${settings.textSize}px "Outfit"`;
-    const textMetrics = ctx.measureText(settings.text);
-    const textWidth = textMetrics.width;
-    const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
-    const lineExtension = 50; // Extra length beyond text on each side
-    const lineSpacing = textHeight * 1.2; // Space between text and lines
-    ctx.restore();
-
-    // Calculate hitbox dimensions based on text metrics
-    const hitboxWidth = textWidth + (lineExtension * 2); // Text width plus line extensions
-    const hitboxHeight = (lineSpacing * 2) + textHeight; // Height including lines and text
+    const { hitboxWidth, hitboxHeight } = getWatermarkLayout(ctx, settings);
 
     const side: WatermarkDragSide = isFront ? 'front' : 'back';
     const dragState = startWatermarkDrag(
@@ -618,7 +752,12 @@ export default function IDMarkingClient() {
     dragStateRef.current = dragState;
 
     if (dragState.isDragging) {
+      setActiveWatermarkSide(side);
       e.preventDefault();
+    } else {
+      setActiveWatermarkSide(currentSide =>
+        currentSide === side ? null : currentSide
+      );
     }
   };
 
@@ -653,18 +792,12 @@ export default function IDMarkingClient() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.save();
-    ctx.font = `${settings.textSize}px "Outfit"`;
-    const textMetrics = ctx.measureText(settings.text);
-    const textWidth = textMetrics.width;
-    const textHeight = textMetrics.actualBoundingBoxAscent + textMetrics.actualBoundingBoxDescent;
-    const lineExtension = 50;
-    const lineSpacing = textHeight * 1.2;
-    ctx.restore();
-
-    // Calculate hitbox dimensions based on text metrics
-    const hitboxWidth = textWidth + (lineExtension * 2);
-    const hitboxHeight = (lineSpacing * 2) + textHeight;
+    const {
+      textWidth,
+      textHeight,
+      hitboxWidth,
+      hitboxHeight,
+    } = getWatermarkLayout(ctx, settings);
 
     const isInBox = isPointInWatermarkBounds(
       { x, y },
@@ -717,6 +850,7 @@ export default function IDMarkingClient() {
 
   const handleEnd = () => {
     resetDragState();
+    setActiveWatermarkSide(null);
   };
 
   const handleTouchStart = (
@@ -885,6 +1019,9 @@ export default function IDMarkingClient() {
       multiTouchGestureRef.current = nextState.isTransforming
         ? { kind: 'watermark', state: nextState }
         : { kind: 'idle' };
+      if (!nextState.isTransforming) {
+        setActiveWatermarkSide(null);
+      }
       resetDragState();
       return;
     }
@@ -898,6 +1035,7 @@ export default function IDMarkingClient() {
       multiTouchGestureRef.current = nextState.isPinching
         ? { kind: 'image', state: nextState }
         : { kind: 'idle' };
+      setActiveWatermarkSide(null);
       resetDragState();
       return;
     }
@@ -906,6 +1044,7 @@ export default function IDMarkingClient() {
 
     resetMultiTouchGesture();
     resetDragState();
+    setActiveWatermarkSide(null);
   };
 
   const handleTouchCancel = (isFront: boolean) => {
@@ -921,6 +1060,7 @@ export default function IDMarkingClient() {
 
     resetMultiTouchGesture();
     resetDragState();
+    setActiveWatermarkSide(null);
   };
 
   useLayoutEffect(() => {
@@ -1081,6 +1221,28 @@ export default function IDMarkingClient() {
       clearCanvas(backEditCanvasRef.current);
     }
   }, [backImage, backLoadedImage, backSettings]);
+
+  useLayoutEffect(() => {
+    if (!frontSelectionCanvasRef.current || !frontEditCanvasRef.current) return;
+
+    drawWatermarkSelection(
+      frontSelectionCanvasRef.current,
+      frontEditCanvasRef.current,
+      frontSettings,
+      activeWatermarkSide === 'front' && Boolean(frontLoadedImage)
+    );
+  }, [activeWatermarkSide, frontLoadedImage, frontSettings]);
+
+  useLayoutEffect(() => {
+    if (!backSelectionCanvasRef.current || !backEditCanvasRef.current) return;
+
+    drawWatermarkSelection(
+      backSelectionCanvasRef.current,
+      backEditCanvasRef.current,
+      backSettings,
+      activeWatermarkSide === 'back' && Boolean(backLoadedImage)
+    );
+  }, [activeWatermarkSide, backLoadedImage, backSettings]);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, isFront: boolean) => {
     e.preventDefault();
@@ -1270,7 +1432,7 @@ export default function IDMarkingClient() {
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <div className="mb-4">
                     <h2 className="text-xl font-semibold">{t('editFrontWatermark')}</h2>
-                    <div className="mt-3 flex items-center gap-1">
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <RotateImageButton
                         direction="left"
                         disabled={!frontImageDimensions || isProcessingFront}
@@ -1283,6 +1445,12 @@ export default function IDMarkingClient() {
                         label={t('rotateImageRight', { side: t('frontID') })}
                         onClick={() => handleRotateImage(true, 'right')}
                       />
+                      <ResetWatermarkButton
+                        disabled={!frontImageDimensions || isProcessingFront}
+                        label={t('resetWatermark')}
+                        description={t('resetWatermarkForSide', { side: t('frontID') })}
+                        onClick={() => handleResetWatermark(true)}
+                      />
                     </div>
                     <p id="front-touch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
                       {t('touchGesturesHint', { scale: (frontSettings.imageScale * 100).toFixed(0) })}
@@ -1293,11 +1461,16 @@ export default function IDMarkingClient() {
                       ref={frontEditCanvasRef}
                       aria-label={t('editFrontWatermark')}
                       aria-describedby="front-touch-hint"
-                      className="w-full rounded-lg touch-pan-y bg-white"
+                      className="block w-full rounded-lg touch-pan-y bg-white"
                       onMouseDown={(e) => handleStart(e, true)}
                       onMouseMove={(e) => handleMove(e, true)}
                       onMouseUp={handleEnd}
                       onMouseLeave={handleEnd}
+                    />
+                    <canvas
+                      ref={frontSelectionCanvasRef}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 h-full w-full rounded-lg"
                     />
                     {(isFrontImageLoading || hasFrontImageError) && (
                       <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/90 px-4 text-center">
@@ -1426,7 +1599,7 @@ export default function IDMarkingClient() {
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <div className="mb-4">
                     <h2 className="text-xl font-semibold">{t('editBackWatermark')}</h2>
-                    <div className="mt-3 flex items-center gap-1">
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
                       <RotateImageButton
                         direction="left"
                         disabled={!backImageDimensions || isProcessingBack}
@@ -1439,6 +1612,12 @@ export default function IDMarkingClient() {
                         label={t('rotateImageRight', { side: t('backID') })}
                         onClick={() => handleRotateImage(false, 'right')}
                       />
+                      <ResetWatermarkButton
+                        disabled={!backImageDimensions || isProcessingBack}
+                        label={t('resetWatermark')}
+                        description={t('resetWatermarkForSide', { side: t('backID') })}
+                        onClick={() => handleResetWatermark(false)}
+                      />
                     </div>
                     <p id="back-touch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
                       {t('touchGesturesHint', { scale: (backSettings.imageScale * 100).toFixed(0) })}
@@ -1449,11 +1628,16 @@ export default function IDMarkingClient() {
                       ref={backEditCanvasRef}
                       aria-label={t('editBackWatermark')}
                       aria-describedby="back-touch-hint"
-                      className="w-full rounded-lg touch-pan-y bg-white"
+                      className="block w-full rounded-lg touch-pan-y bg-white"
                       onMouseDown={(e) => handleStart(e, false)}
                       onMouseMove={(e) => handleMove(e, false)}
                       onMouseUp={handleEnd}
                       onMouseLeave={handleEnd}
+                    />
+                    <canvas
+                      ref={backSelectionCanvasRef}
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 h-full w-full rounded-lg"
                     />
                     {(isBackImageLoading || hasBackImageError) && (
                       <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/90 px-4 text-center">
