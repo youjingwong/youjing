@@ -5,6 +5,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "node --experimental-strip-types --test lib/imageRotation.spec.mjs",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit"
   },

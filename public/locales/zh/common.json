@@ -15,6 +15,8 @@
   "rotation": "旋转角度",
   "editFrontWatermark": "编辑正面水印",
   "editBackWatermark": "编辑背面水印",
+  "rotateImageLeft": "将{{side}}向左旋转 90°",
+  "rotateImageRight": "将{{side}}向右旋转 90°",
   "uploadImageToEdit": "上传图片以编辑水印",
   "downloadFront": "下载正面",
   "downloadBack": "下载背面",

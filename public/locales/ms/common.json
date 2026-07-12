@@ -15,6 +15,8 @@
   "rotation": "Putaran",
   "editFrontWatermark": "Edit Tanda Air Hadapan",
   "editBackWatermark": "Edit Tanda Air Belakang",
+  "rotateImageLeft": "Putar {{side}} 90° ke kiri",
+  "rotateImageRight": "Putar {{side}} 90° ke kanan",
   "uploadImageToEdit": "Muat naik imej untuk mengedit tanda air",
   "downloadFront": "Muat Turun Hadapan",
   "downloadBack": "Muat Turun Belakang",

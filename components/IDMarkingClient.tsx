@@ -1,6 +1,14 @@
 import { useTranslation } from 'next-i18next/pages';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
+import {
+  getNextImageRotationState,
+  getRotatedImageDimensions,
+  normalizeRotation,
+  OUTPUT_CANVAS_WIDTH,
+  type ImageDimensions,
+  type RotationDirection,
+} from '../lib/imageRotation';
 import LanguageSwitcher from './LanguageSwitcher';
 
 interface ProcessingSettings {
@@ -12,6 +20,7 @@ interface ProcessingSettings {
   xPosition: number;
   yPosition: number;
   imageScale: number;
+  imageRotation: number;
 }
 
 interface DragState {
@@ -51,7 +60,49 @@ const defaultSettings: ProcessingSettings = {
   xPosition: 400,
   yPosition: 300,
   imageScale: 1.0,  // 100%
+  imageRotation: 0,
 };
+
+interface RotateImageButtonProps {
+  direction: RotationDirection;
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}
+
+function RotateImageButton({
+  direction,
+  disabled,
+  label,
+  onClick,
+}: RotateImageButtonProps) {
+  const isLeft = direction === 'left';
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-gray-700 bg-gray-800 text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4"
+      >
+        <path d={isLeft ? 'M3 12a9 9 0 1 0 2.64-6.36L3 8' : 'M21 12a9 9 0 1 1-2.64-6.36L21 8'} />
+        <path d={isLeft ? 'M3 3v5h5' : 'M21 3v5h-5'} />
+      </svg>
+    </button>
+  );
+}
 
 export default function IDMarkingClient() {
   const { t, i18n } = useTranslation('common');
@@ -59,6 +110,8 @@ export default function IDMarkingClient() {
   const initialWatermarkText = getDefaultText(t('defaultWatermarkText'));
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
+  const [frontImageDimensions, setFrontImageDimensions] = useState<ImageDimensions | null>(null);
+  const [backImageDimensions, setBackImageDimensions] = useState<ImageDimensions | null>(null);
   const [frontSettings, setFrontSettings] = useState<ProcessingSettings>(() => ({
     ...defaultSettings,
     text: initialWatermarkText,
@@ -150,8 +203,22 @@ export default function IDMarkingClient() {
       if (uploadGenerationRef.current !== requestId) return;
 
       if (isFront) {
+        setFrontImageDimensions(null);
+        setFrontSettings(prev => ({
+          ...prev,
+          imageRotation: 0,
+          xPosition: defaultSettings.xPosition,
+          yPosition: defaultSettings.yPosition,
+        }));
         setFrontImage(imageFile);
       } else {
+        setBackImageDimensions(null);
+        setBackSettings(prev => ({
+          ...prev,
+          imageRotation: 0,
+          xPosition: defaultSettings.xPosition,
+          yPosition: defaultSettings.yPosition,
+        }));
         setBackImage(imageFile);
       }
     } catch (error) {
@@ -174,11 +241,25 @@ export default function IDMarkingClient() {
     backUploadGenerationRef.current += 1;
     setFrontImage(null);
     setBackImage(null);
+    setFrontImageDimensions(null);
+    setBackImageDimensions(null);
     setIsDraggingFront(false);
     setIsDraggingBack(false);
     setIsProcessingFront(false);
     setIsProcessingBack(false);
     setDebugInfo([]);
+    setFrontSettings(prev => ({
+      ...prev,
+      imageRotation: 0,
+      xPosition: defaultSettings.xPosition,
+      yPosition: defaultSettings.yPosition,
+    }));
+    setBackSettings(prev => ({
+      ...prev,
+      imageRotation: 0,
+      xPosition: defaultSettings.xPosition,
+      yPosition: defaultSettings.yPosition,
+    }));
 
     if (frontFileInputRef.current) {
       frontFileInputRef.current.value = '';
@@ -186,6 +267,23 @@ export default function IDMarkingClient() {
     if (backFileInputRef.current) {
       backFileInputRef.current.value = '';
     }
+  };
+
+  const handleRotateImage = (isFront: boolean, direction: RotationDirection) => {
+    const setSettings = isFront ? setFrontSettings : setBackSettings;
+    const imageDimensions = isFront ? frontImageDimensions : backImageDimensions;
+
+    if (!imageDimensions) return;
+
+    setSettings(prev => ({
+      ...prev,
+      ...getNextImageRotationState(
+        imageDimensions,
+        prev.imageRotation,
+        prev.yPosition,
+        direction
+      ),
+    }));
   };
 
   const getCanvasPosition = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
@@ -428,24 +526,32 @@ export default function IDMarkingClient() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas dimensions
-    canvas.width = 1500; // Fixed canvas size
-    canvas.height = 1500 * (image.height / image.width); // Maintain aspect ratio
+    const imageRotation = normalizeRotation(settings.imageRotation);
+    const sourceWidth = image.naturalWidth || image.width;
+    const sourceHeight = image.naturalHeight || image.height;
+    const rotatedDimensions = getRotatedImageDimensions(
+      { width: sourceWidth, height: sourceHeight },
+      imageRotation
+    );
+
+    // Set canvas dimensions based on the rotated image orientation.
+    canvas.width = OUTPUT_CANVAS_WIDTH;
+    canvas.height = OUTPUT_CANVAS_WIDTH * (rotatedDimensions.height / rotatedDimensions.width);
 
     // Clear canvas
     ctx.fillStyle = '#FFFFFF'; // White background
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Calculate dimensions to fill width at 100% scale
-    const width = canvas.width * settings.imageScale;
-    const height = (canvas.width * (image.height / image.width)) * settings.imageScale;
+    // Draw the scaled image around the canvas center so quarter turns remain uncropped.
+    const baseScale = canvas.width / rotatedDimensions.width;
+    const width = sourceWidth * baseScale * settings.imageScale;
+    const height = sourceHeight * baseScale * settings.imageScale;
 
-    // Center the scaled image
-    const x = (canvas.width - width) / 2;
-    const y = (canvas.height - height) / 2;
-
-    // Draw image
-    ctx.drawImage(image, x, y, width, height);
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((imageRotation * Math.PI) / 180);
+    ctx.drawImage(image, -width / 2, -height / 2, width, height);
+    ctx.restore();
 
     // Save context state
     ctx.save();
@@ -499,7 +605,8 @@ export default function IDMarkingClient() {
     const updateCanvas = async (
       image: File,
       editCanvas: HTMLCanvasElement | null,
-      settings: ProcessingSettings
+      settings: ProcessingSettings,
+      setImageDimensions: (dimensions: ImageDimensions) => void
     ) => {
       const img = new Image();
       const objectUrl = URL.createObjectURL(image);
@@ -531,8 +638,15 @@ export default function IDMarkingClient() {
           img.src = objectUrl;
         });
 
-        if (!cancelled && editCanvas) {
-          processImage(editCanvas, img, settings, true);
+        if (!cancelled) {
+          setImageDimensions({
+            width: img.naturalWidth || img.width,
+            height: img.naturalHeight || img.height,
+          });
+
+          if (editCanvas) {
+            processImage(editCanvas, img, settings, true);
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -549,7 +663,8 @@ export default function IDMarkingClient() {
       updateCanvas(
         frontImage,
         frontEditCanvasRef.current,
-        frontSettings
+        frontSettings,
+        setFrontImageDimensions
       );
     }
 
@@ -557,7 +672,8 @@ export default function IDMarkingClient() {
       updateCanvas(
         backImage,
         backEditCanvasRef.current,
-        backSettings
+        backSettings,
+        setBackImageDimensions
       );
     }
 
@@ -753,7 +869,23 @@ export default function IDMarkingClient() {
                 </div>
 
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">{t('editFrontWatermark')}</h2>
+                  <div className="mb-4 flex items-center gap-2">
+                    <h2 className="text-xl font-semibold">{t('editFrontWatermark')}</h2>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <RotateImageButton
+                        direction="left"
+                        disabled={!frontImageDimensions || isProcessingFront}
+                        label={t('rotateImageLeft', { side: t('frontID') })}
+                        onClick={() => handleRotateImage(true, 'left')}
+                      />
+                      <RotateImageButton
+                        direction="right"
+                        disabled={!frontImageDimensions || isProcessingFront}
+                        label={t('rotateImageRight', { side: t('frontID') })}
+                        onClick={() => handleRotateImage(true, 'right')}
+                      />
+                    </div>
+                  </div>
                   <div className="relative">
                     <canvas
                       ref={frontEditCanvasRef}
@@ -884,7 +1016,23 @@ export default function IDMarkingClient() {
                 </div>
 
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">{t('editBackWatermark')}</h2>
+                  <div className="mb-4 flex items-center gap-2">
+                    <h2 className="text-xl font-semibold">{t('editBackWatermark')}</h2>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <RotateImageButton
+                        direction="left"
+                        disabled={!backImageDimensions || isProcessingBack}
+                        label={t('rotateImageLeft', { side: t('backID') })}
+                        onClick={() => handleRotateImage(false, 'left')}
+                      />
+                      <RotateImageButton
+                        direction="right"
+                        disabled={!backImageDimensions || isProcessingBack}
+                        label={t('rotateImageRight', { side: t('backID') })}
+                        onClick={() => handleRotateImage(false, 'right')}
+                      />
+                    </div>
+                  </div>
                   <div className="relative">
                     <canvas
                       ref={backEditCanvasRef}
