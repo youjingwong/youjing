@@ -148,6 +148,49 @@ function RotateImageButton({
   );
 }
 
+interface ZoomImageButtonProps {
+  direction: 'in' | 'out';
+  disabled: boolean;
+  label: string;
+  onClick: () => void;
+}
+
+function ZoomImageButton({
+  direction,
+  disabled,
+  label,
+  onClick,
+}: ZoomImageButtonProps) {
+  const isZoomIn = direction === 'in';
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-gray-700 bg-gray-800 text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-4 w-4"
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="m20 20-4-4" />
+        <path d="M8 11h6" />
+        {isZoomIn && <path d="M11 8v6" />}
+      </svg>
+    </button>
+  );
+}
+
 interface ResetWatermarkButtonProps {
   disabled: boolean;
   label: string;
@@ -1363,27 +1406,6 @@ export default function IDMarkingClient() {
             {frontImage && (
               <>
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">{t('frontImageSettings')}</h2>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      {t('imageScale')}: {(frontSettings.imageScale * 100).toFixed(0)}%
-                    </label>
-                    <input
-                      type="range"
-                      min={MIN_IMAGE_SCALE}
-                      max={MAX_IMAGE_SCALE}
-                      step={IMAGE_SCALE_STEP}
-                      value={frontSettings.imageScale}
-                      onChange={(e) => setFrontSettings({
-                        ...frontSettings,
-                        imageScale: clampImageScale(parseFloat(e.target.value)),
-                      })}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mb-4"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <h2 className="text-xl font-semibold mb-4">{t('frontWatermarkText')}</h2>
                   <input
                     type="text"
@@ -1445,6 +1467,29 @@ export default function IDMarkingClient() {
                         label={t('rotateImageRight', { side: t('frontID') })}
                         onClick={() => handleRotateImage(true, 'right')}
                       />
+                      <div className="flex items-center gap-2" role="group" aria-label={t('imageScale')}>
+                        <ZoomImageButton
+                          direction="out"
+                          disabled={isProcessingFront || frontSettings.imageScale <= MIN_IMAGE_SCALE}
+                          label={t('zoomOut', { side: t('frontID') })}
+                          onClick={() => setFrontSettings((settings) => ({
+                            ...settings,
+                            imageScale: clampImageScale(settings.imageScale - IMAGE_SCALE_STEP),
+                          }))}
+                        />
+                        <output className="min-w-12 text-center text-sm tabular-nums text-gray-300" aria-live="polite">
+                          {(frontSettings.imageScale * 100).toFixed(0)}%
+                        </output>
+                        <ZoomImageButton
+                          direction="in"
+                          disabled={isProcessingFront || frontSettings.imageScale >= MAX_IMAGE_SCALE}
+                          label={t('zoomIn', { side: t('frontID') })}
+                          onClick={() => setFrontSettings((settings) => ({
+                            ...settings,
+                            imageScale: clampImageScale(settings.imageScale + IMAGE_SCALE_STEP),
+                          }))}
+                        />
+                      </div>
                       <ResetWatermarkButton
                         disabled={!frontImageDimensions || isProcessingFront}
                         label={t('resetWatermark')}
@@ -1530,27 +1575,6 @@ export default function IDMarkingClient() {
             {backImage && (
               <>
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">{t('backImageSettings')}</h2>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      {t('imageScale')}: {(backSettings.imageScale * 100).toFixed(0)}%
-                    </label>
-                    <input
-                      type="range"
-                      min={MIN_IMAGE_SCALE}
-                      max={MAX_IMAGE_SCALE}
-                      step={IMAGE_SCALE_STEP}
-                      value={backSettings.imageScale}
-                      onChange={(e) => setBackSettings({
-                        ...backSettings,
-                        imageScale: clampImageScale(parseFloat(e.target.value)),
-                      })}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mb-4"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <h2 className="text-xl font-semibold mb-4">{t('backWatermarkText')}</h2>
                   <input
                     type="text"
@@ -1612,6 +1636,29 @@ export default function IDMarkingClient() {
                         label={t('rotateImageRight', { side: t('backID') })}
                         onClick={() => handleRotateImage(false, 'right')}
                       />
+                      <div className="flex items-center gap-2" role="group" aria-label={t('imageScale')}>
+                        <ZoomImageButton
+                          direction="out"
+                          disabled={isProcessingBack || backSettings.imageScale <= MIN_IMAGE_SCALE}
+                          label={t('zoomOut', { side: t('backID') })}
+                          onClick={() => setBackSettings((settings) => ({
+                            ...settings,
+                            imageScale: clampImageScale(settings.imageScale - IMAGE_SCALE_STEP),
+                          }))}
+                        />
+                        <output className="min-w-12 text-center text-sm tabular-nums text-gray-300" aria-live="polite">
+                          {(backSettings.imageScale * 100).toFixed(0)}%
+                        </output>
+                        <ZoomImageButton
+                          direction="in"
+                          disabled={isProcessingBack || backSettings.imageScale >= MAX_IMAGE_SCALE}
+                          label={t('zoomIn', { side: t('backID') })}
+                          onClick={() => setBackSettings((settings) => ({
+                            ...settings,
+                            imageScale: clampImageScale(settings.imageScale + IMAGE_SCALE_STEP),
+                          }))}
+                        />
+                      </div>
                       <ResetWatermarkButton
                         disabled={!backImageDimensions || isProcessingBack}
                         label={t('resetWatermark')}

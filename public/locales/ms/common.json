@@ -8,6 +8,8 @@
   "frontImageSettings": "Tetapan Imej Hadapan",
   "backImageSettings": "Tetapan Imej Belakang",
   "imageScale": "Skala Imej",
+  "zoomOut": "Zum keluar {{side}}",
+  "zoomIn": "Zum masuk {{side}}",
   "frontWatermarkText": "Teks Tanda Air Hadapan",
   "backWatermarkText": "Teks Tanda Air Belakang",
   "watermarkColor": "Warna Tanda Air",

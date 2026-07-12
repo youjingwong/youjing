@@ -8,6 +8,8 @@
   "frontImageSettings": "Front Image Settings",
   "backImageSettings": "Back Image Settings",
   "imageScale": "Image Scale",
+  "zoomOut": "Zoom out {{side}}",
+  "zoomIn": "Zoom in {{side}}",
   "frontWatermarkText": "Front Watermark Text",
   "backWatermarkText": "Back Watermark Text",
   "watermarkColor": "Watermark Color",
