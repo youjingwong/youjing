@@ -7,7 +7,14 @@ export default function LanguageSwitcher() {
   const { pathname, asPath, query, locale } = router;
 
   const changeLanguage = (newLocale: string) => {
-    router.push({ pathname, query }, asPath, { locale: newLocale });
+    const safeQuery = { ...query };
+    delete safeQuery.text;
+
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.delete('text');
+    const cleanAsPath = `${asPath.split(/[?#]/, 1)[0]}${currentUrl.search}${currentUrl.hash}`;
+
+    router.push({ pathname, query: safeQuery }, cleanAsPath, { locale: newLocale });
   };
 
   return (

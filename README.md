@@ -1,49 +1,53 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# youjing.dev
 
-## Getting Started
+Personal site and the Palang IC browser-based watermarking tool.
 
-First, run the development server:
+## Getting started
+
+Install dependencies and run the development server:
 
 ```bash
-npm run dev
-# or
+yarn install --frozen-lockfile
 yarn dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+## Palang IC privacy architecture
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+Palang IC is designed so selected images never need to reach the application server:
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+- The editor is client-only and runs on a statically generated page.
+- Selected files are kept in temporary React state.
+- HEIC conversion runs locally through the bundled `heic2any` library.
+- Watermarking and image composition use the browser Canvas API.
+- Downloads are generated directly in the browser as local data/blob URLs.
+- The application has no image upload endpoint, database integration, or persistent browser storage.
+- Image object URLs are revoked after decoding, and the UI provides a Clear images action.
+- Google Analytics is omitted from the tool route, and its Content Security Policy blocks third-party connections.
+- Custom watermark text links use a URL fragment (`#text=...`), which is not sent in HTTP requests.
 
-## Learn More
+Only files the user explicitly downloads are saved to their device. Clear images removes images from the editor and invalidates pending results; refreshing or closing the tab ends the browser working session.
 
-To learn more about Next.js, take a look at the following resources:
+## Verification
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+yarn lint
+yarn typecheck
+yarn audit
+yarn build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+## Google Analytics setup
 
-## Deploy on Vercel
+Portfolio pages support Google Analytics 4. Analytics is deliberately not loaded on Palang IC pages.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Create a Google Analytics 4 property.
+2. Get its Measurement ID.
+3. Add it to `.env.local`:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
-
-## Google Analytics Setup
-
-This project includes Google Analytics 4 integration. To set it up:
-
-1. Create a Google Analytics 4 property in your [Google Analytics account](https://analytics.google.com/)
-2. Get your Measurement ID (it starts with "G-")
-3. Create a `.env.local` file in the root directory if it doesn't exist
-4. Add your Measurement ID to the `.env.local` file:
-   ```
+   ```bash
    NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
    ```
-   Replace `G-XXXXXXXXXX` with your actual Measurement ID
 
-The analytics code will automatically track page views and you can use the `gtag.event()` function from `lib/gtag.ts` to track custom events.
+Page URLs are reduced to their pathname before being sent to analytics, so query strings and fragments are excluded.

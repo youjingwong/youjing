@@ -26,33 +26,33 @@ const PalangIC = () => {
   const getDescription = () => {
     switch (locale) {
       case 'ms':
-        return 'Palang dan tambah tanda air pada imej MyKad Malaysia. Alat mudah untuk MyKad, IC, dan dokumen pengenalan. Palang IC dengan mudah.';
+        return 'Palang dan tambah tanda air pada imej IC/MyKad secara peribadi dalam pelayar anda. Imej kekal pada peranti anda dan tidak pernah dimuat naik.';
       case 'zh':
-        return '在马来西亚MyKad图像上划线和添加水印。适用于MyKad、IC和身份证件的简易工具。轻松划线IC。';
+        return '直接在浏览器中为马来西亚 IC/MyKad 图片划线和添加水印。图片保留在您的设备上，绝不会上传。';
       default:
-        return 'Cross out and watermark Malaysian IC/MyKad images. Easy to use tool for MyKad, IC, and identification documents. Palang IC dengan mudah.';
+        return 'Cross out and watermark Malaysian IC/MyKad images privately in your browser. Images stay on your device and are never uploaded.';
     }
   };
 
   const getOgDescription = () => {
     switch (locale) {
       case 'ms':
-        return 'Palang dan tambah tanda air pada imej MyKad Malaysia. Mudah, selamat, tiada pendaftaran diperlukan. Palang IC dengan mudah dan selamat.';
+        return 'Privasi terbina dalam: palang dan tambah tanda air pada IC/MyKad terus dalam pelayar. Tiada muat naik atau simpanan imej pada pelayan.';
       case 'zh':
-        return '在马来西亚MyKad图像上划线和添加水印。简单、安全，无需注册。轻松安全地划线IC。';
+        return '隐私优先：直接在浏览器中为 IC/MyKad 图片划线和添加水印，无需上传，服务器也不存储图片。';
       default:
-        return 'Cross out and watermark Malaysian IC/MyKad images. Simple, secure, no registration required. Palang IC dengan mudah dan selamat.';
+        return 'Private by design: cross out and watermark IC/MyKad images in your browser with no image uploads or server-side image storage.';
     }
   };
 
   const getJsonLdDescription = () => {
     switch (locale) {
       case 'ms':
-        return "Alat dalam talian untuk memalangi dan menambah tanda air pada imej MyKad Malaysia";
+        return "Alat privasi untuk memalangi dan menambah tanda air pada imej IC/MyKad secara setempat dalam pelayar";
       case 'zh':
-        return "用于在马来西亚MyKad图像上划线和添加水印的在线工具";
+        return "在浏览器本地为马来西亚 IC/MyKad 图片划线和添加水印的隐私工具";
       default:
-        return "Online tool for crossing out and watermarking Malaysian IC/MyKad images";
+        return "Privacy-first browser tool for crossing out and watermarking Malaysian IC/MyKad images locally";
     }
   };
 

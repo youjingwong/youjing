@@ -1,10 +1,17 @@
 import type { NextPage } from "next";
 import Head from "next/head";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import * as gtag from "../lib/gtag";
+import { isPrivateToolPath } from "../lib/privacy";
 import { workSummaries } from "../src/data/work_summaries";
 
 const Home: NextPage = () => {
+  const router = useRouter();
+  const privateToolHref = router.locale && router.locale !== router.defaultLocale
+    ? `/${router.locale}/palang-ic`
+    : "/palang-ic";
+
   // Example function to track a link click
   const handleLinkClick = (linkName: string) => {
     gtag.event({
@@ -26,9 +33,9 @@ const Home: NextPage = () => {
           <Link href="/blogs" className="underline ml-3" onClick={() => handleLinkClick("blogs")}>
             Blogs
           </Link>
-          <Link href="/palang-ic" className="underline ml-3" onClick={() => handleLinkClick("palang_ic")}>
+          <a href={privateToolHref} className="underline ml-3" onClick={gtag.disable}>
             Palang IC
-          </Link>
+          </a>
           <Link href="/" className="disabled:bg-gray-50 ml-3">
             About
           </Link>
@@ -58,12 +65,20 @@ const Home: NextPage = () => {
         <h2 className="mt-4 ">Work</h2>
 
         {workSummaries.map((workSummary, index) => {
+          const isPrivateTool = isPrivateToolPath(workSummary.href);
+
           return (
             <div className="mt-4" key={index}>
               <p className="mt-3">
-                <Link href={workSummary.href} className="underline">
-                  <strong>{workSummary.title}</strong>
-                </Link>{" "}
+                {isPrivateTool ? (
+                  <a href={privateToolHref} className="underline" onClick={gtag.disable}>
+                    <strong>{workSummary.title}</strong>
+                  </a>
+                ) : (
+                  <Link href={workSummary.href} className="underline">
+                    <strong>{workSummary.title}</strong>
+                  </Link>
+                )}{" "}
                 {workSummary.body}
               </p>
             </div>

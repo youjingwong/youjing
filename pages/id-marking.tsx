@@ -26,13 +26,13 @@ const IDMarking = () => {
   const SEO: NextSeoProps = {
     title: `${t('title')} | Palang IC`,
     description: locale === 'ms'
-      ? 'Palang dan tambah tanda air pada imej MyKad Malaysia. Alat mudah untuk MyKad, IC, dan dokumen pengenalan. Palang IC dengan mudah.'
-      : 'Cross out and watermark Malaysian IC/MyKad images. Easy to use tool for MyKad, IC, and identification documents. Palang IC dengan mudah.',
+      ? 'Palang dan tambah tanda air pada imej IC/MyKad secara peribadi dalam pelayar anda. Imej kekal pada peranti anda dan tidak pernah dimuat naik.'
+      : 'Cross out and watermark Malaysian IC/MyKad images privately in your browser. Images stay on your device and are never uploaded.',
     openGraph: {
       title: `${t('title')} | Palang IC`,
       description: locale === 'ms'
-        ? 'Palang dan tambah tanda air pada imej MyKad Malaysia. Mudah, selamat, tiada pendaftaran diperlukan. Palang IC dengan mudah dan selamat.'
-        : 'Cross out and watermark Malaysian IC/MyKad images. Simple, secure, no registration required. Palang IC dengan mudah dan selamat.',
+        ? 'Privasi terbina dalam: palang dan tambah tanda air pada IC/MyKad terus dalam pelayar. Tiada muat naik atau simpanan imej pada pelayan.'
+        : 'Private by design: cross out and watermark IC/MyKad images in your browser with no image uploads or server-side image storage.',
       url: 'https://www.youjing.dev/id-marking',
       type: 'website',
       images: [
@@ -83,8 +83,8 @@ const IDMarking = () => {
     "@type": "WebApplication",
     "name": t('title'),
     "description": locale === 'ms'
-      ? "Alat dalam talian untuk memalangi dan menambah tanda air pada imej MyKad Malaysia"
-      : "Online tool for crossing out and watermarking Malaysian IC/MyKad images",
+      ? "Alat privasi untuk memalangi dan menambah tanda air pada imej IC/MyKad secara setempat dalam pelayar"
+      : "Privacy-first browser tool for crossing out and watermarking Malaysian IC/MyKad images locally",
     "applicationCategory": "Utility",
     "operatingSystem": "Any",
     "offers": {

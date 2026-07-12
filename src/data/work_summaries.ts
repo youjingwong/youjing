@@ -1,8 +1,8 @@
 export const workSummaries = [
   {
     title: "ID Marking",
-    href: "/id-marking",
-    body: `- A tool for crossing out and watermarking Malaysian IC/MyKad images. Features include image scaling, watermark text customization, rotation control, and combined image download.`,
+    href: "/palang-ic",
+    body: `- A privacy-first tool for crossing out and watermarking Malaysian IC/MyKad images entirely in the browser. Images stay on the user's device and are never uploaded or stored on a server.`,
   },
   {
     title: "Pulang Mengundi",

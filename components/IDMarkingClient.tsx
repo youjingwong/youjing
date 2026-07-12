@@ -26,8 +26,9 @@ interface DragState {
 // Get default text from URL parameter or use fallback
 const getDefaultText = (defaultText: string) => {
   if (typeof window !== 'undefined') {
+    const hashParams = new URLSearchParams(window.location.hash.slice(1));
     const urlParams = new URLSearchParams(window.location.search);
-    const textParam = urlParams.get('text');
+    const textParam = hashParams.get('text') || urlParams.get('text');
     return textParam || defaultText;
   }
   return defaultText;
@@ -68,8 +69,14 @@ export default function IDMarkingClient() {
   }));
   const frontEditCanvasRef = useRef<HTMLCanvasElement>(null);
   const backEditCanvasRef = useRef<HTMLCanvasElement>(null);
+  const frontFileInputRef = useRef<HTMLInputElement>(null);
+  const backFileInputRef = useRef<HTMLInputElement>(null);
+  const frontUploadGenerationRef = useRef(0);
+  const backUploadGenerationRef = useRef(0);
   const [isDraggingFront, setIsDraggingFront] = useState<boolean>(false);
   const [isDraggingBack, setIsDraggingBack] = useState<boolean>(false);
+  const [isProcessingFront, setIsProcessingFront] = useState<boolean>(false);
+  const [isProcessingBack, setIsProcessingBack] = useState<boolean>(false);
   const dragStateRef = useRef<DragState>({
     isDragging: false,
     startX: 0,
@@ -79,6 +86,27 @@ export default function IDMarkingClient() {
     type: null,
   });
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const legacyText = url.searchParams.get('text');
+
+    if (!legacyText) return;
+
+    const hashParams = new URLSearchParams(url.hash.slice(1));
+    if (!hashParams.has('text')) {
+      hashParams.set('text', legacyText);
+    }
+
+    url.searchParams.delete('text');
+    const search = url.searchParams.toString();
+    const hash = hashParams.toString();
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${url.pathname}${search ? `?${search}` : ''}${hash ? `#${hash}` : ''}`
+    );
+  }, []);
 
   useEffect(() => {
     const syncLocalizedWatermarkText = () => {
@@ -99,10 +127,15 @@ export default function IDMarkingClient() {
   const handleImageUpload = async (file: File, isFront: boolean) => {
     if (!file || !isSupportedImage(file)) return;
 
-    let imageFile = file;
-    // Convert HEIC to JPEG if needed
-    if (isHeicImage(file)) {
-      try {
+    const uploadGenerationRef = isFront ? frontUploadGenerationRef : backUploadGenerationRef;
+    const setIsProcessing = isFront ? setIsProcessingFront : setIsProcessingBack;
+    const requestId = ++uploadGenerationRef.current;
+    setIsProcessing(true);
+
+    try {
+      let imageFile = file;
+      // Convert HEIC to JPEG if needed
+      if (isHeicImage(file)) {
         const heic2any = (await import('heic2any')).default;
         const blob = await heic2any({
           blob: file,
@@ -112,16 +145,46 @@ export default function IDMarkingClient() {
         imageFile = new File([blob as Blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
           type: 'image/jpeg',
         });
-      } catch (error) {
-        console.error('Error converting HEIC image:', error);
-        return;
+      }
+
+      if (uploadGenerationRef.current !== requestId) return;
+
+      if (isFront) {
+        setFrontImage(imageFile);
+      } else {
+        setBackImage(imageFile);
+      }
+    } catch (error) {
+      if (uploadGenerationRef.current === requestId) {
+        const fileInput = isFront ? frontFileInputRef.current : backFileInputRef.current;
+        if (fileInput) {
+          fileInput.value = '';
+        }
+        console.error('Error processing image:', error);
+      }
+    } finally {
+      if (uploadGenerationRef.current === requestId) {
+        setIsProcessing(false);
       }
     }
+  };
 
-    if (isFront) {
-      setFrontImage(imageFile);
-    } else {
-      setBackImage(imageFile);
+  const handleClearImages = () => {
+    frontUploadGenerationRef.current += 1;
+    backUploadGenerationRef.current += 1;
+    setFrontImage(null);
+    setBackImage(null);
+    setIsDraggingFront(false);
+    setIsDraggingBack(false);
+    setIsProcessingFront(false);
+    setIsProcessingBack(false);
+    setDebugInfo([]);
+
+    if (frontFileInputRef.current) {
+      frontFileInputRef.current.value = '';
+    }
+    if (backFileInputRef.current) {
+      backFileInputRef.current.value = '';
     }
   };
 
@@ -429,17 +492,56 @@ export default function IDMarkingClient() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    const objectUrls = new Set<string>();
+    const cancelImageLoads = new Set<() => void>();
+
     const updateCanvas = async (
       image: File,
       editCanvas: HTMLCanvasElement | null,
       settings: ProcessingSettings
     ) => {
       const img = new Image();
-      img.src = URL.createObjectURL(image);
-      await new Promise((resolve) => (img.onload = resolve));
+      const objectUrl = URL.createObjectURL(image);
+      objectUrls.add(objectUrl);
 
-      if (editCanvas) {
-        processImage(editCanvas, img, settings, true);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const clearHandlers = () => {
+            img.onload = null;
+            img.onerror = null;
+          };
+          const cancelLoad = () => {
+            clearHandlers();
+            img.src = '';
+            reject(new DOMException('Image load cancelled', 'AbortError'));
+          };
+
+          cancelImageLoads.add(cancelLoad);
+          img.onload = () => {
+            cancelImageLoads.delete(cancelLoad);
+            clearHandlers();
+            resolve();
+          };
+          img.onerror = () => {
+            cancelImageLoads.delete(cancelLoad);
+            clearHandlers();
+            reject(new Error('Unable to decode the selected image'));
+          };
+          img.src = objectUrl;
+        });
+
+        if (!cancelled && editCanvas) {
+          processImage(editCanvas, img, settings, true);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Error loading image:', error);
+        }
+      } finally {
+        if (objectUrls.delete(objectUrl)) {
+          URL.revokeObjectURL(objectUrl);
+        }
       }
     };
 
@@ -458,6 +560,14 @@ export default function IDMarkingClient() {
         backSettings
       );
     }
+
+    return () => {
+      cancelled = true;
+      cancelImageLoads.forEach((cancelLoad) => cancelLoad());
+      cancelImageLoads.clear();
+      objectUrls.forEach((objectUrl) => URL.revokeObjectURL(objectUrl));
+      objectUrls.clear();
+    };
   }, [frontImage, backImage, frontSettings, backSettings]);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>, isFront: boolean) => {
@@ -507,6 +617,42 @@ export default function IDMarkingClient() {
           <LanguageSwitcher />
         </div>
 
+        <section
+          aria-labelledby="privacy-title"
+          className="mb-8 rounded-xl border border-emerald-800/70 bg-emerald-950/40 p-5 shadow-sm sm:p-6"
+        >
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="max-w-3xl">
+              <div className="inline-flex rounded-full border border-emerald-700 bg-emerald-950 px-3 py-1 text-xs font-semibold text-emerald-300">
+                {t('privacyBadge')}
+              </div>
+              <h2 id="privacy-title" className="mt-3 text-2xl text-emerald-100">
+                {t('privacyTitle')}
+              </h2>
+              <div className="mt-2 text-sm leading-6 text-gray-200">
+                {t('privacySummary')}
+              </div>
+            </div>
+            {(frontImage || backImage || isProcessingFront || isProcessingBack) && (
+              <button
+                type="button"
+                onClick={handleClearImages}
+                className="shrink-0 rounded-md border border-emerald-700 px-4 py-2 text-sm font-medium text-emerald-200 hover:bg-emerald-900/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400"
+              >
+                {t('clearImages')}
+              </button>
+            )}
+          </div>
+          <ul className="mt-5 grid grid-cols-3 gap-2 text-center text-xs leading-4 text-emerald-100 sm:text-sm">
+            <li className="flex min-h-12 items-center justify-center rounded-md bg-emerald-950/70 px-2 py-2"><span aria-hidden="true">✓</span>&nbsp;{t('privacyPointLocal')}</li>
+            <li className="flex min-h-12 items-center justify-center rounded-md bg-emerald-950/70 px-2 py-2"><span aria-hidden="true">✓</span>&nbsp;{t('privacyPointNoUpload')}</li>
+            <li className="flex min-h-12 items-center justify-center rounded-md bg-emerald-950/70 px-2 py-2"><span aria-hidden="true">✓</span>&nbsp;{t('privacyPointNoStorage')}</li>
+          </ul>
+          <div className="mt-4 text-xs leading-5 text-gray-400">
+            {t('privacySession')}
+          </div>
+        </section>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Front ID Section */}
           <div>
@@ -519,6 +665,7 @@ export default function IDMarkingClient() {
                 onDrop={(e) => handleDrop(e, true)}
               >
                 <input
+                  ref={frontFileInputRef}
                   type="file"
                   accept="image/*,.heic,.heif"
                   onChange={(e) => handleImageUpload(e.target.files?.[0] as File, true)}
@@ -529,7 +676,12 @@ export default function IDMarkingClient() {
                   htmlFor="front-upload"
                   className="cursor-pointer block p-4 text-gray-400 hover:text-gray-200"
                 >
-                  {frontImage ? frontImage.name : isDraggingFront ? t('dropImageHere') : t('uploadFrontID')}
+                  <span className="block">
+                    {isProcessingFront ? t('processingImage') : frontImage ? frontImage.name : isDraggingFront ? t('dropImageHere') : t('uploadFrontID')}
+                  </span>
+                  <span className="mt-2 block text-xs text-emerald-300">
+                    {t('privacyUploadHint')}
+                  </span>
                 </label>
               </div>
             </div>
@@ -644,6 +796,7 @@ export default function IDMarkingClient() {
                 onDrop={(e) => handleDrop(e, false)}
               >
                 <input
+                  ref={backFileInputRef}
                   type="file"
                   accept="image/*,.heic,.heif"
                   onChange={(e) => handleImageUpload(e.target.files?.[0] as File, false)}
@@ -654,7 +807,12 @@ export default function IDMarkingClient() {
                   htmlFor="back-upload"
                   className="cursor-pointer block p-4 text-gray-400 hover:text-gray-200"
                 >
-                  {backImage ? backImage.name : isDraggingBack ? t('dropImageHere') : t('uploadBackID')}
+                  <span className="block">
+                    {isProcessingBack ? t('processingImage') : backImage ? backImage.name : isDraggingBack ? t('dropImageHere') : t('uploadBackID')}
+                  </span>
+                  <span className="mt-2 block text-xs text-emerald-300">
+                    {t('privacyUploadHint')}
+                  </span>
                 </label>
               </div>
             </div>
@@ -778,8 +936,8 @@ export default function IDMarkingClient() {
             <p>• {t('tipDragDrop')}</p>
             <p>• {t('tipDrag')}</p>
             <p>• {t('tipSliders')}</p>
-            <p>• {t('tipCustomize')} <code className="bg-gray-800 px-2 py-1 rounded-sm">?text=YOUR_TEXT</code> {t('example')}</p>
-            <p className="text-sm text-gray-400">{t('example')}: {typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}?text=SAMPLE%20ONLY` : 'https://youjing.dev/id-marking?text=SAMPLE%20ONLY'}</p>
+            <p>• {t('tipCustomize')} <code className="bg-gray-800 px-2 py-1 rounded-sm">#text=YOUR_TEXT</code> {t('example')}</p>
+            <p className="text-sm text-gray-400">{t('example')}: {typeof window !== 'undefined' ? `${window.location.origin}${window.location.pathname}#text=SAMPLE%20ONLY` : 'https://youjing.dev/palang-ic#text=SAMPLE%20ONLY'}</p>
           </div>
         </div>
       </div>

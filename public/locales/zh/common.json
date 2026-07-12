@@ -26,5 +26,15 @@
   "tipCustomize": "通过添加以下内容自定义默认水印文字",
   "example": "示例",
   "defaultWatermarkText": "仅供个人使用",
-  "language": "语言"
+  "language": "语言",
+  "privacyBadge": "隐私优先",
+  "privacyTitle": "您的证件图片始终保留在设备上",
+  "privacySummary": "HEIC 转换、水印处理和导出均直接在您的浏览器中完成。图片绝不会上传、发送给我们或存储在我们的服务器上。",
+  "privacySession": "图片仅在编辑期间暂存于此标签页的内存中。刷新页面、关闭标签页或点击“清除图片”即可将图片从编辑器中移除。只有您主动下载的处理结果才会另存为设备上的新文件。",
+  "privacyPointLocal": "本地处理",
+  "privacyPointNoUpload": "不上传图片",
+  "privacyPointNoStorage": "服务器不存储图片",
+  "privacyUploadHint": "图片保留在您的设备上，绝不上传。",
+  "clearImages": "清除图片",
+  "processingImage": "正在本地处理…"
 }

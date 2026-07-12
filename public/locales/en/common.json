@@ -26,5 +26,15 @@
   "tipCustomize": "Customize the default watermark text by adding",
   "example": "Example",
   "defaultWatermarkText": "FOR PRIVATE USE ONLY",
-  "language": "Language"
+  "language": "Language",
+  "privacyBadge": "Private by design",
+  "privacyTitle": "Your ID images stay on your device",
+  "privacySummary": "HEIC conversion, watermarking, and export all happen directly in your browser. Your images are never uploaded to, sent to, or stored on our servers.",
+  "privacySession": "Images stay only in this tab's temporary memory while you edit. Refresh, close the tab, or use Clear images to remove them from the editor. Only the results you choose to download are saved as new files on your device.",
+  "privacyPointLocal": "Processed locally",
+  "privacyPointNoUpload": "No image uploads",
+  "privacyPointNoStorage": "No server image storage",
+  "privacyUploadHint": "Stays on your device — never uploaded.",
+  "clearImages": "Clear images",
+  "processingImage": "Processing locally…"
 }

@@ -6,6 +6,7 @@ import Document, {
   NextScript,
 } from "next/document";
 import { GA_MEASUREMENT_ID } from "../lib/gtag";
+import { isPrivateToolPath } from "../lib/privacy";
 
 class MyDocument extends Document {
   static async getInitialProps(ctx: DocumentContext) {
@@ -15,37 +16,33 @@ class MyDocument extends Document {
   }
 
   render() {
+    const isPrivateToolPage = isPrivateToolPath(this.props.__NEXT_DATA__.page);
+    const shouldLoadAnalytics = Boolean(GA_MEASUREMENT_ID) && !isPrivateToolPage;
+
     return (
       <Html className="dark bg-stone-800">
         <Head>
-          {/* Google Analytics */}
-          <script
-            async
-            src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-          />
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${GA_MEASUREMENT_ID}', {
-                  page_path: window.location.pathname,
-                });
-              `,
-            }}
-          />
-          {/* End Google Analytics */}
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link
-            rel="preconnect"
-            href="https://fonts.gstatic.com"
-            crossOrigin=""
-          />
-          <link
-            href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap"
-            rel="stylesheet"
-          />
+          {shouldLoadAnalytics && (
+            <>
+              <script
+                async
+                src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+              />
+              <script
+                dangerouslySetInnerHTML={{
+                  __html: `
+                    window.dataLayer = window.dataLayer || [];
+                    function gtag(){dataLayer.push(arguments);}
+                    gtag('js', new Date());
+                    gtag('config', '${GA_MEASUREMENT_ID}', {
+                      page_path: window.location.pathname,
+                      page_location: window.location.origin + window.location.pathname,
+                    });
+                  `,
+                }}
+              />
+            </>
+          )}
           <link
             rel="apple-touch-icon"
             sizes="57x57"

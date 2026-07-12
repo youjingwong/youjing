@@ -26,5 +26,15 @@
   "tipCustomize": "Sesuaikan teks tanda air lalai dengan menambah",
   "example": "Contoh",
   "defaultWatermarkText": "UNTUK KEGUNAAN PERIBADI SAHAJA",
-  "language": "Bahasa"
+  "language": "Bahasa",
+  "privacyBadge": "Direka untuk privasi",
+  "privacyTitle": "IC anda kekal pada peranti anda",
+  "privacySummary": "Penukaran HEIC, penambahan tanda air dan eksport semuanya dilakukan terus dalam pelayar anda. Imej anda tidak pernah dimuat naik, dihantar kepada kami atau disimpan pada pelayan kami.",
+  "privacySession": "Alat ini hanya mengekalkan imej pilihan anda dalam tab ini semasa anda mengedit. Muat semula halaman, tutup tab atau gunakan Kosongkan imej untuk mengeluarkannya daripada alat ini. Hanya hasil yang anda pilih untuk dimuat turun akan disimpan sebagai fail baharu pada peranti anda.",
+  "privacyPointLocal": "Diproses secara setempat",
+  "privacyPointNoUpload": "Tiada muat naik imej",
+  "privacyPointNoStorage": "Imej tidak disimpan pada pelayan",
+  "privacyUploadHint": "Kekal pada peranti anda — tidak pernah dimuat naik.",
+  "clearImages": "Kosongkan imej",
+  "processingImage": "Sedang diproses secara setempat…"
 }
