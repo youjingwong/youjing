@@ -27,6 +27,16 @@ import {
   type ImageDimensions,
   type RotationDirection,
 } from '../lib/imageRotation';
+import {
+  createIdleWatermarkDragState,
+  getPointInRotatedSpace,
+  isPointInWatermarkBounds,
+  moveWatermarkDrag,
+  startWatermarkDrag,
+  type WatermarkDragInput,
+  type WatermarkDragSide,
+  type WatermarkDragState,
+} from '../lib/watermarkHitTest';
 import LanguageSwitcher from './LanguageSwitcher';
 
 interface ProcessingSettings {
@@ -41,13 +51,11 @@ interface ProcessingSettings {
   imageRotation: number;
 }
 
-interface DragState {
-  isDragging: boolean;
-  startX: number;
-  startY: number;
-  startRotation: number;
-  startSize: number;
-  type: 'move' | 'rotate' | 'resize' | null;
+interface CanvasTouchHandlers {
+  start: (event: TouchEvent) => void;
+  move: (event: TouchEvent) => void;
+  end: (event: TouchEvent) => void;
+  cancel: () => void;
 }
 
 // Get default text from URL parameter or use fallback
@@ -180,7 +188,7 @@ const getImageDimensions = (image: HTMLImageElement | null): ImageDimensions | n
       }
     : null;
 
-const getPinchTouches = (touches: React.TouchList): PinchTouch[] =>
+const getPinchTouches = (touches: TouchList): PinchTouch[] =>
   Array.from(touches, touch => ({
     identifier: touch.identifier,
     x: touch.clientX,
@@ -290,20 +298,15 @@ export default function IDMarkingClient() {
   const backEditCanvasRef = useRef<HTMLCanvasElement>(null);
   const frontFileInputRef = useRef<HTMLInputElement>(null);
   const backFileInputRef = useRef<HTMLInputElement>(null);
+  const frontTouchHandlersRef = useRef<CanvasTouchHandlers | null>(null);
+  const backTouchHandlersRef = useRef<CanvasTouchHandlers | null>(null);
   const frontUploadGenerationRef = useRef(0);
   const backUploadGenerationRef = useRef(0);
   const [isDraggingFront, setIsDraggingFront] = useState<boolean>(false);
   const [isDraggingBack, setIsDraggingBack] = useState<boolean>(false);
   const [isProcessingFront, setIsProcessingFront] = useState<boolean>(false);
   const [isProcessingBack, setIsProcessingBack] = useState<boolean>(false);
-  const dragStateRef = useRef<DragState>({
-    isDragging: false,
-    startX: 0,
-    startY: 0,
-    startRotation: 0,
-    startSize: 0,
-    type: null,
-  });
+  const dragStateRef = useRef<WatermarkDragState>(createIdleWatermarkDragState());
   const pinchStateRef = useRef<PinchGestureState>(createIdlePinchGestureState());
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
 
@@ -345,8 +348,7 @@ export default function IDMarkingClient() {
   }, [i18n, router]);
 
   const resetDragState = () => {
-    dragStateRef.current.isDragging = false;
-    dragStateRef.current.type = null;
+    dragStateRef.current = createIdleWatermarkDragState();
   };
 
   const resetPinchState = () => {
@@ -354,7 +356,7 @@ export default function IDMarkingClient() {
   };
 
   const beginPinch = (
-    touches: React.TouchList,
+    touches: TouchList,
     isFront: boolean,
     startScale: number
   ) => {
@@ -484,51 +486,58 @@ export default function IDMarkingClient() {
     }));
   };
 
-  const getCanvasPosition = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
+  const getCanvasPointer = (
+    e: React.MouseEvent<HTMLCanvasElement> | TouchEvent,
+    canvas: HTMLCanvasElement,
+    expectedTouchIdentifier: number | null = null
+  ) => {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-
-    let clientX, clientY;
+    let clientX: number;
+    let clientY: number;
+    let input: WatermarkDragInput;
+    let touchIdentifier: number | null = null;
 
     if ('touches' in e) {
-      // Touch event
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
+      const targetTouches = Array.from(e.targetTouches);
+      const touch = expectedTouchIdentifier === null
+        ? targetTouches[0]
+        : targetTouches.find(item => item.identifier === expectedTouchIdentifier);
+
+      if (!touch) return null;
+
+      clientX = touch.clientX;
+      clientY = touch.clientY;
+      input = 'touch';
+      touchIdentifier = touch.identifier;
     } else {
       // Mouse event
       clientX = e.clientX;
       clientY = e.clientY;
+      input = 'mouse';
     }
 
     return {
-      x: (clientX - rect.left) * scaleX,
-      y: (clientY - rect.top) * scaleY
+      point: {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY,
+      },
+      input,
+      touchIdentifier,
     };
   };
 
-  const handleStart = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, isFront: boolean) => {
-    e.preventDefault();
+  const handleStart = (e: React.MouseEvent<HTMLCanvasElement> | TouchEvent, isFront: boolean) => {
     const canvas = isFront ? frontEditCanvasRef.current : backEditCanvasRef.current;
     const settings = isFront ? frontSettings : backSettings;
     if (!canvas) return;
 
     resetDragState();
 
-    const { x, y } = getCanvasPosition(e, canvas);
-
-    // Transform click/touch coordinates to account for watermark rotation
-    const centerX = settings.xPosition;
-    const centerY = settings.yPosition;
-    const angle = (settings.rotation * Math.PI) / 180;
-
-    // Translate point to origin
-    const dx = x - centerX;
-    const dy = y - centerY;
-
-    // Rotate point
-    const rotatedX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
-    const rotatedY = dx * Math.sin(-angle) + dy * Math.cos(-angle);
+    const pointer = getCanvasPointer(e, canvas);
+    if (!pointer) return;
+    const { x, y } = pointer.point;
 
     // Get text metrics for accurate hitbox
     const ctx = canvas.getContext('2d');
@@ -547,40 +556,50 @@ export default function IDMarkingClient() {
     const hitboxWidth = textWidth + (lineExtension * 2); // Text width plus line extensions
     const hitboxHeight = (lineSpacing * 2) + textHeight; // Height including lines and text
 
-    // Check if point is within watermark bounds
-    const isInBox =
-      rotatedX >= -hitboxWidth / 2 && // left bound
-      rotatedX <= hitboxWidth / 2 && // right bound
-      rotatedY >= -hitboxHeight / 2 && // top bound
-      rotatedY <= hitboxHeight / 2; // bottom bound
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+    const dragState = startWatermarkDrag(
+      pointer.point,
+      { x: settings.xPosition, y: settings.yPosition },
+      settings.rotation,
+      hitboxWidth,
+      hitboxHeight,
+      side,
+      pointer.input,
+      pointer.touchIdentifier
+    );
+    dragStateRef.current = dragState;
 
-    if (isInBox) {
-      dragStateRef.current = {
-        isDragging: true,
-        startX: x,
-        startY: y,
-        startRotation: settings.rotation,
-        startSize: settings.textSize,
-        type: 'move',
-      };
+    if (dragState.isDragging) {
+      e.preventDefault();
     }
   };
 
-  const handleMove = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, isFront: boolean) => {
-    e.preventDefault();
+  const handleMove = (e: React.MouseEvent<HTMLCanvasElement> | TouchEvent, isFront: boolean) => {
+    const isTouchEvent = 'touches' in e;
+
+    if (isTouchEvent && !dragStateRef.current.isDragging) return;
+
     const canvas = isFront ? frontEditCanvasRef.current : backEditCanvasRef.current;
     const settings = isFront ? frontSettings : backSettings;
     const setSettings = isFront ? setFrontSettings : setBackSettings;
     if (!canvas) return;
 
-    const { x, y } = getCanvasPosition(e, canvas);
+    const side: WatermarkDragSide = isFront ? 'front' : 'back';
+    const expectedTouchIdentifier =
+      dragStateRef.current.isDragging &&
+      dragStateRef.current.side === side &&
+      dragStateRef.current.input === 'touch'
+        ? dragStateRef.current.touchIdentifier
+        : null;
+    const pointer = getCanvasPointer(e, canvas, expectedTouchIdentifier);
+    if (!pointer) return;
+    const { x, y } = pointer.point;
 
-    // Transform coordinates to check hover state
-    const dx = x - settings.xPosition;
-    const dy = y - settings.yPosition;
-    const angle = (settings.rotation * Math.PI) / 180;
-    const rotatedX = dx * Math.cos(-angle) - dy * Math.sin(-angle);
-    const rotatedY = dx * Math.sin(-angle) + dy * Math.cos(-angle);
+    const rotatedPoint = getPointInRotatedSpace(
+      { x, y },
+      { x: settings.xPosition, y: settings.yPosition },
+      settings.rotation
+    );
 
     // Get text metrics for accurate hitbox
     const ctx = canvas.getContext('2d');
@@ -599,16 +618,18 @@ export default function IDMarkingClient() {
     const hitboxWidth = textWidth + (lineExtension * 2);
     const hitboxHeight = (lineSpacing * 2) + textHeight;
 
-    const isInBox =
-      rotatedX >= -hitboxWidth / 2 &&
-      rotatedX <= hitboxWidth / 2 &&
-      rotatedY >= -hitboxHeight / 2 &&
-      rotatedY <= hitboxHeight / 2;
+    const isInBox = isPointInWatermarkBounds(
+      { x, y },
+      { x: settings.xPosition, y: settings.yPosition },
+      settings.rotation,
+      hitboxWidth,
+      hitboxHeight
+    );
 
     // Update debug info
     setDebugInfo([
       `Mouse: (${Math.round(x)}, ${Math.round(y)})`,
-      `Rotated: (${Math.round(rotatedX)}, ${Math.round(rotatedY)})`,
+      `Rotated: (${Math.round(rotatedPoint.x)}, ${Math.round(rotatedPoint.y)})`,
       `Text Center: (${Math.round(settings.xPosition)}, ${Math.round(settings.yPosition)})`,
       `Text Size: ${settings.textSize}px`,
       `Text Width: ${Math.round(textWidth)}px`,
@@ -621,21 +642,28 @@ export default function IDMarkingClient() {
     ]);
 
     // Update cursor style based on hover position (mouse only)
-    if (!dragStateRef.current.isDragging && !('touches' in e)) {
+    if (!dragStateRef.current.isDragging && !isTouchEvent) {
       canvas.style.cursor = isInBox ? 'move' : 'default';
       return;
     }
 
-    if (dragStateRef.current.isDragging && dragStateRef.current.type === 'move') {
-      const dx = x - dragStateRef.current.startX;
-      const dy = y - dragStateRef.current.startY;
+    const dragMove = moveWatermarkDrag(
+      dragStateRef.current,
+      pointer.point,
+      side,
+      pointer.input,
+      pointer.touchIdentifier
+    );
+    const dragDelta = dragMove.delta;
+
+    if (dragDelta) {
+      e.preventDefault();
       setSettings((prev) => ({
         ...prev,
-        xPosition: prev.xPosition + dx,
-        yPosition: prev.yPosition + dy,
+        xPosition: prev.xPosition + dragDelta.x,
+        yPosition: prev.yPosition + dragDelta.y,
       }));
-      dragStateRef.current.startX = x;
-      dragStateRef.current.startY = y;
+      dragStateRef.current = dragMove.state;
     }
   };
 
@@ -644,7 +672,7 @@ export default function IDMarkingClient() {
   };
 
   const handleTouchStart = (
-    e: React.TouchEvent<HTMLCanvasElement>,
+    e: TouchEvent,
     isFront: boolean
   ) => {
     const side: PinchSide = isFront ? 'front' : 'back';
@@ -667,7 +695,7 @@ export default function IDMarkingClient() {
   };
 
   const handleTouchMove = (
-    e: React.TouchEvent<HTMLCanvasElement>,
+    e: TouchEvent,
     isFront: boolean
   ) => {
     const pinchState = pinchStateRef.current;
@@ -707,7 +735,7 @@ export default function IDMarkingClient() {
   };
 
   const handleTouchEnd = (
-    e: React.TouchEvent<HTMLCanvasElement>,
+    e: TouchEvent,
     isFront: boolean
   ) => {
     const pinchState = pinchStateRef.current;
@@ -731,6 +759,75 @@ export default function IDMarkingClient() {
     resetPinchState();
     resetDragState();
   };
+
+  useLayoutEffect(() => {
+    frontTouchHandlersRef.current = {
+      start: event => handleTouchStart(event, true),
+      move: event => handleTouchMove(event, true),
+      end: event => handleTouchEnd(event, true),
+      cancel: handleTouchCancel,
+    };
+    backTouchHandlersRef.current = {
+      start: event => handleTouchStart(event, false),
+      move: event => handleTouchMove(event, false),
+      end: event => handleTouchEnd(event, false),
+      cancel: handleTouchCancel,
+    };
+  });
+
+  useLayoutEffect(() => {
+    const canvas = frontEditCanvasRef.current;
+    if (!canvas) return;
+
+    const handleNativeTouchStart = (event: TouchEvent) =>
+      frontTouchHandlersRef.current?.start(event);
+    const handleNativeTouchMove = (event: TouchEvent) =>
+      frontTouchHandlersRef.current?.move(event);
+    const handleNativeTouchEnd = (event: TouchEvent) =>
+      frontTouchHandlersRef.current?.end(event);
+    const handleNativeTouchCancel = () =>
+      frontTouchHandlersRef.current?.cancel();
+    const options: AddEventListenerOptions = { passive: false };
+
+    canvas.addEventListener('touchstart', handleNativeTouchStart, options);
+    canvas.addEventListener('touchmove', handleNativeTouchMove, options);
+    canvas.addEventListener('touchend', handleNativeTouchEnd, options);
+    canvas.addEventListener('touchcancel', handleNativeTouchCancel, options);
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleNativeTouchStart);
+      canvas.removeEventListener('touchmove', handleNativeTouchMove);
+      canvas.removeEventListener('touchend', handleNativeTouchEnd);
+      canvas.removeEventListener('touchcancel', handleNativeTouchCancel);
+    };
+  }, [frontImage]);
+
+  useLayoutEffect(() => {
+    const canvas = backEditCanvasRef.current;
+    if (!canvas) return;
+
+    const handleNativeTouchStart = (event: TouchEvent) =>
+      backTouchHandlersRef.current?.start(event);
+    const handleNativeTouchMove = (event: TouchEvent) =>
+      backTouchHandlersRef.current?.move(event);
+    const handleNativeTouchEnd = (event: TouchEvent) =>
+      backTouchHandlersRef.current?.end(event);
+    const handleNativeTouchCancel = () =>
+      backTouchHandlersRef.current?.cancel();
+    const options: AddEventListenerOptions = { passive: false };
+
+    canvas.addEventListener('touchstart', handleNativeTouchStart, options);
+    canvas.addEventListener('touchmove', handleNativeTouchMove, options);
+    canvas.addEventListener('touchend', handleNativeTouchEnd, options);
+    canvas.addEventListener('touchcancel', handleNativeTouchCancel, options);
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleNativeTouchStart);
+      canvas.removeEventListener('touchmove', handleNativeTouchMove);
+      canvas.removeEventListener('touchend', handleNativeTouchEnd);
+      canvas.removeEventListener('touchcancel', handleNativeTouchCancel);
+    };
+  }, [backImage]);
 
   const handleDownload = (canvas: HTMLCanvasElement, suffix: string) => {
     // For iOS Chrome compatibility
@@ -1033,15 +1130,11 @@ export default function IDMarkingClient() {
                       ref={frontEditCanvasRef}
                       aria-label={t('editFrontWatermark')}
                       aria-describedby="front-pinch-hint"
-                      className="w-full rounded-lg touch-none bg-white"
+                      className="w-full rounded-lg touch-pan-y bg-white"
                       onMouseDown={(e) => handleStart(e, true)}
                       onMouseMove={(e) => handleMove(e, true)}
                       onMouseUp={handleEnd}
                       onMouseLeave={handleEnd}
-                      onTouchStart={(e) => handleTouchStart(e, true)}
-                      onTouchMove={(e) => handleTouchMove(e, true)}
-                      onTouchEnd={(e) => handleTouchEnd(e, true)}
-                      onTouchCancel={handleTouchCancel}
                     />
                     {(isFrontImageLoading || hasFrontImageError) && (
                       <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/90 px-4 text-center">
@@ -1193,15 +1286,11 @@ export default function IDMarkingClient() {
                       ref={backEditCanvasRef}
                       aria-label={t('editBackWatermark')}
                       aria-describedby="back-pinch-hint"
-                      className="w-full rounded-lg touch-none bg-white"
+                      className="w-full rounded-lg touch-pan-y bg-white"
                       onMouseDown={(e) => handleStart(e, false)}
                       onMouseMove={(e) => handleMove(e, false)}
                       onMouseUp={handleEnd}
                       onMouseLeave={handleEnd}
-                      onTouchStart={(e) => handleTouchStart(e, false)}
-                      onTouchMove={(e) => handleTouchMove(e, false)}
-                      onTouchEnd={(e) => handleTouchEnd(e, false)}
-                      onTouchCancel={handleTouchCancel}
                     />
                     {(isBackImageLoading || hasBackImageError) && (
                       <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg bg-white/90 px-4 text-center">
