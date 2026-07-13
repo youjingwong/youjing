@@ -1,6 +1,13 @@
 import { useTranslation } from 'next-i18next/pages';
 import { useRouter } from 'next/router';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import {
   clampImageScale,
   DEFAULT_IMAGE_SCALE,
@@ -211,7 +218,7 @@ function ResetWatermarkButton({
       disabled={disabled}
       aria-label={description}
       title={description}
-      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-gray-700 bg-gray-800 px-3 text-sm text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-8"
+      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-gray-700 bg-gray-800 text-gray-300 transition-colors hover:border-gray-600 hover:bg-gray-700 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-400 disabled:cursor-not-allowed disabled:opacity-50 sm:h-8 sm:w-8"
     >
       <svg
         aria-hidden="true"
@@ -226,8 +233,224 @@ function ResetWatermarkButton({
         <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
         <path d="M3 3v5h5" />
       </svg>
-      <span>{label}</span>
+      <span className="sr-only">{label}</span>
     </button>
+  );
+}
+
+interface EditorControlsProps {
+  idPrefix: 'front' | 'back';
+  sideLabel: string;
+  textLabel: string;
+  settings: ProcessingSettings;
+  setSettings: Dispatch<SetStateAction<ProcessingSettings>>;
+  disabled: boolean;
+  onRotate: (direction: RotationDirection) => void;
+  onReset: () => void;
+}
+
+function EditorControls({
+  idPrefix,
+  sideLabel,
+  textLabel,
+  settings,
+  setSettings,
+  disabled,
+  onRotate,
+  onReset,
+}: EditorControlsProps) {
+  const { t } = useTranslation('common');
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-700 bg-gray-950/40">
+      <div
+        className="flex flex-wrap items-center gap-2 p-3"
+        role="group"
+        aria-label={`${sideLabel}: ${t('imageControls')}`}
+      >
+        <div className="mr-1 inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+          >
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <circle cx="8.5" cy="10" r="1.5" />
+            <path d="m21 15-5-5L5 19" />
+          </svg>
+          <span>{t('imageControls')}</span>
+        </div>
+        <RotateImageButton
+          direction="left"
+          disabled={disabled}
+          label={t('rotateImageLeft', { side: sideLabel })}
+          onClick={() => onRotate('left')}
+        />
+        <RotateImageButton
+          direction="right"
+          disabled={disabled}
+          label={t('rotateImageRight', { side: sideLabel })}
+          onClick={() => onRotate('right')}
+        />
+        <div className="flex items-center gap-2" role="group" aria-label={t('imageScale')}>
+          <ZoomImageButton
+            direction="out"
+            disabled={disabled || settings.imageScale <= MIN_IMAGE_SCALE}
+            label={t('zoomOut', { side: sideLabel })}
+            onClick={() => setSettings((current) => ({
+              ...current,
+              imageScale: clampImageScale(current.imageScale - IMAGE_SCALE_STEP),
+            }))}
+          />
+          <output className="min-w-11 text-center text-xs tabular-nums text-gray-300" aria-live="polite">
+            {(settings.imageScale * 100).toFixed(0)}%
+          </output>
+          <ZoomImageButton
+            direction="in"
+            disabled={disabled || settings.imageScale >= MAX_IMAGE_SCALE}
+            label={t('zoomIn', { side: sideLabel })}
+            onClick={() => setSettings((current) => ({
+              ...current,
+              imageScale: clampImageScale(current.imageScale + IMAGE_SCALE_STEP),
+            }))}
+          />
+        </div>
+      </div>
+
+      <div
+        className="flex flex-wrap items-center gap-2 border-t border-gray-700 p-3"
+        role="group"
+        aria-label={`${sideLabel}: ${t('watermarkControls')}`}
+      >
+        <div
+          className="mr-1 inline-flex h-8 w-5 shrink-0 items-center justify-center text-gray-400"
+          title={t('watermarkControls')}
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4"
+          >
+            <path d="M5 7V4h14v3" />
+            <path d="M9 20h6" />
+            <path d="M12 4v16" />
+          </svg>
+          <span className="sr-only">{t('watermarkControls')}</span>
+        </div>
+
+        <label htmlFor={`${idPrefix}-watermark-text`} className="sr-only">
+          {textLabel}
+        </label>
+        <input
+          id={`${idPrefix}-watermark-text`}
+          type="text"
+          value={settings.text}
+          onChange={(event) => setSettings((current) => ({ ...current, text: event.target.value }))}
+          className="h-11 min-w-32 flex-1 basis-32 rounded-md border border-gray-600 bg-gray-800 px-3 text-sm text-white shadow-xs focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:h-8"
+        />
+
+        <label
+          htmlFor={`${idPrefix}-watermark-color`}
+          title={`${t('watermarkColor')}: ${settings.color.toUpperCase()}`}
+          className="relative flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-gray-600 bg-gray-800 sm:h-8 sm:w-8"
+        >
+          <span className="sr-only">{t('watermarkColor')}: {settings.color.toUpperCase()}</span>
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="white"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="pointer-events-none relative z-10 h-4 w-4 drop-shadow-sm"
+          >
+            <path d="M12 22a9 9 0 1 0 0-18c-1.1 0-2 .9-2 2 0 .5.2 1 .6 1.4.4.4.6.9.6 1.4 0 1.1-.9 2-2 2H7a4 4 0 0 0 0 8h1.5c1 0 1.8.8 1.8 1.8 0 .8.7 1.4 1.7 1.4Z" />
+            <circle cx="7.5" cy="10.5" r=".5" fill="white" />
+            <circle cx="10.5" cy="7.5" r=".5" fill="white" />
+            <circle cx="14.5" cy="7.5" r=".5" fill="white" />
+            <circle cx="16.5" cy="11.5" r=".5" fill="white" />
+          </svg>
+          <input
+            id={`${idPrefix}-watermark-color`}
+            type="color"
+            value={settings.color}
+            onChange={(event) => setSettings((current) => ({ ...current, color: event.target.value }))}
+            className="absolute inset-0 h-full w-full cursor-pointer border-0 p-0 opacity-70"
+          />
+        </label>
+
+        <label
+          htmlFor={`${idPrefix}-watermark-size`}
+          title={`${t('watermarkSize')}: ${settings.textSize}px`}
+          className="flex h-11 items-center gap-2 rounded-md border border-gray-700 bg-gray-900 px-2 sm:h-8"
+        >
+          <span aria-hidden="true" className="text-xs font-semibold text-gray-300">A</span>
+          <span className="sr-only">{t('watermarkSize')}</span>
+          <input
+            id={`${idPrefix}-watermark-size`}
+            type="range"
+            min={MIN_WATERMARK_TEXT_SIZE}
+            max={MAX_WATERMARK_TEXT_SIZE}
+            step="1"
+            value={settings.textSize}
+            onChange={(event) => setSettings((current) => ({ ...current, textSize: parseInt(event.target.value) }))}
+            className="h-2 w-20 cursor-pointer appearance-none rounded-lg bg-gray-700 sm:w-10"
+          />
+          <output className="min-w-9 text-right text-xs tabular-nums text-gray-400">{settings.textSize}px</output>
+        </label>
+
+        <label
+          htmlFor={`${idPrefix}-watermark-rotation`}
+          title={`${t('rotation')}: ${settings.rotation}°`}
+          className="flex h-11 items-center gap-2 rounded-md border border-gray-700 bg-gray-900 px-2 sm:h-8"
+        >
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-4 w-4 text-gray-300"
+          >
+            <path d="M4 18h16" />
+            <path d="M6 18a6 6 0 0 1 12 0" />
+            <path d="M12 12v6" />
+          </svg>
+          <span className="sr-only">{t('rotation')}</span>
+          <input
+            id={`${idPrefix}-watermark-rotation`}
+            type="range"
+            min="-180"
+            max="180"
+            step="1"
+            value={settings.rotation}
+            onChange={(event) => setSettings((current) => ({ ...current, rotation: parseInt(event.target.value) }))}
+            className="h-2 w-20 cursor-pointer appearance-none rounded-lg bg-gray-700 sm:w-10"
+          />
+          <output className="min-w-8 text-right text-xs tabular-nums text-gray-400">{settings.rotation}°</output>
+        </label>
+
+        <ResetWatermarkButton
+          disabled={disabled}
+          label={t('resetWatermark')}
+          description={t('resetWatermarkForSide', { side: sideLabel })}
+          onClick={onReset}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -1428,95 +1651,18 @@ export default function IDMarkingClient() {
             {frontImage && (
               <>
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">{t('frontWatermarkText')}</h2>
-                  <input
-                    type="text"
-                    value={frontSettings.text}
-                    onChange={(e) => setFrontSettings({ ...frontSettings, text: e.target.value })}
-                    className="block w-full rounded-md border-gray-600 bg-gray-800 text-white shadow-xs focus:border-blue-500 focus:ring-blue-500 mb-4"
-                  />
-                  <div>
-                    <label htmlFor="front-watermark-color" className="block text-sm font-medium text-gray-300 mb-2">
-                      {t('watermarkColor')}: {frontSettings.color.toUpperCase()}
-                    </label>
-                    <input
-                      id="front-watermark-color"
-                      type="color"
-                      value={frontSettings.color}
-                      onChange={(e) => setFrontSettings({ ...frontSettings, color: e.target.value })}
-                      className="block w-full h-10 rounded-md border border-gray-600 bg-gray-800 p-1 cursor-pointer mb-4"
-                    />
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      {t('watermarkSize')}: {frontSettings.textSize}px
-                    </label>
-                    <input
-                      type="range"
-                      min={MIN_WATERMARK_TEXT_SIZE}
-                      max={MAX_WATERMARK_TEXT_SIZE}
-                      step="1"
-                      value={frontSettings.textSize}
-                      onChange={(e) => setFrontSettings({ ...frontSettings, textSize: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mb-4"
-                    />
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      {t('rotation')}: {frontSettings.rotation}°
-                    </label>
-                    <input
-                      type="range"
-                      min="-180"
-                      max="180"
-                      step="1"
-                      value={frontSettings.rotation}
-                      onChange={(e) => setFrontSettings({ ...frontSettings, rotation: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <div className="mb-4">
                     <h2 className="text-xl font-semibold">{t('editFrontImage')}</h2>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <RotateImageButton
-                        direction="left"
+                    <div className="mt-3">
+                      <EditorControls
+                        idPrefix="front"
+                        sideLabel={t('frontID')}
+                        textLabel={t('frontWatermarkText')}
+                        settings={frontSettings}
+                        setSettings={setFrontSettings}
                         disabled={!frontImageDimensions || isProcessingFront}
-                        label={t('rotateImageLeft', { side: t('frontID') })}
-                        onClick={() => handleRotateImage(true, 'left')}
-                      />
-                      <RotateImageButton
-                        direction="right"
-                        disabled={!frontImageDimensions || isProcessingFront}
-                        label={t('rotateImageRight', { side: t('frontID') })}
-                        onClick={() => handleRotateImage(true, 'right')}
-                      />
-                      <div className="flex items-center gap-2" role="group" aria-label={t('imageScale')}>
-                        <ZoomImageButton
-                          direction="out"
-                          disabled={isProcessingFront || frontSettings.imageScale <= MIN_IMAGE_SCALE}
-                          label={t('zoomOut', { side: t('frontID') })}
-                          onClick={() => setFrontSettings((settings) => ({
-                            ...settings,
-                            imageScale: clampImageScale(settings.imageScale - IMAGE_SCALE_STEP),
-                          }))}
-                        />
-                        <output className="min-w-12 text-center text-sm tabular-nums text-gray-300" aria-live="polite">
-                          {(frontSettings.imageScale * 100).toFixed(0)}%
-                        </output>
-                        <ZoomImageButton
-                          direction="in"
-                          disabled={isProcessingFront || frontSettings.imageScale >= MAX_IMAGE_SCALE}
-                          label={t('zoomIn', { side: t('frontID') })}
-                          onClick={() => setFrontSettings((settings) => ({
-                            ...settings,
-                            imageScale: clampImageScale(settings.imageScale + IMAGE_SCALE_STEP),
-                          }))}
-                        />
-                      </div>
-                      <ResetWatermarkButton
-                        disabled={!frontImageDimensions || isProcessingFront}
-                        label={t('resetWatermark')}
-                        description={t('resetWatermarkForSide', { side: t('frontID') })}
-                        onClick={() => handleResetWatermark(true)}
+                        onRotate={(direction) => handleRotateImage(true, direction)}
+                        onReset={() => handleResetWatermark(true)}
                       />
                     </div>
                     <p id="front-touch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">
@@ -1597,95 +1743,18 @@ export default function IDMarkingClient() {
             {backImage && (
               <>
                 <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
-                  <h2 className="text-xl font-semibold mb-4">{t('backWatermarkText')}</h2>
-                  <input
-                    type="text"
-                    value={backSettings.text}
-                    onChange={(e) => setBackSettings({ ...backSettings, text: e.target.value })}
-                    className="block w-full rounded-md border-gray-600 bg-gray-800 text-white shadow-xs focus:border-blue-500 focus:ring-blue-500 mb-4"
-                  />
-                  <div>
-                    <label htmlFor="back-watermark-color" className="block text-sm font-medium text-gray-300 mb-2">
-                      {t('watermarkColor')}: {backSettings.color.toUpperCase()}
-                    </label>
-                    <input
-                      id="back-watermark-color"
-                      type="color"
-                      value={backSettings.color}
-                      onChange={(e) => setBackSettings({ ...backSettings, color: e.target.value })}
-                      className="block w-full h-10 rounded-md border border-gray-600 bg-gray-800 p-1 cursor-pointer mb-4"
-                    />
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      {t('watermarkSize')}: {backSettings.textSize}px
-                    </label>
-                    <input
-                      type="range"
-                      min={MIN_WATERMARK_TEXT_SIZE}
-                      max={MAX_WATERMARK_TEXT_SIZE}
-                      step="1"
-                      value={backSettings.textSize}
-                      onChange={(e) => setBackSettings({ ...backSettings, textSize: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer mb-4"
-                    />
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      {t('rotation')}: {backSettings.rotation}°
-                    </label>
-                    <input
-                      type="range"
-                      min="-180"
-                      max="180"
-                      step="1"
-                      value={backSettings.rotation}
-                      onChange={(e) => setBackSettings({ ...backSettings, rotation: parseInt(e.target.value) })}
-                      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-gray-900 rounded-lg shadow-sm p-6 mb-8">
                   <div className="mb-4">
                     <h2 className="text-xl font-semibold">{t('editBackImage')}</h2>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <RotateImageButton
-                        direction="left"
+                    <div className="mt-3">
+                      <EditorControls
+                        idPrefix="back"
+                        sideLabel={t('backID')}
+                        textLabel={t('backWatermarkText')}
+                        settings={backSettings}
+                        setSettings={setBackSettings}
                         disabled={!backImageDimensions || isProcessingBack}
-                        label={t('rotateImageLeft', { side: t('backID') })}
-                        onClick={() => handleRotateImage(false, 'left')}
-                      />
-                      <RotateImageButton
-                        direction="right"
-                        disabled={!backImageDimensions || isProcessingBack}
-                        label={t('rotateImageRight', { side: t('backID') })}
-                        onClick={() => handleRotateImage(false, 'right')}
-                      />
-                      <div className="flex items-center gap-2" role="group" aria-label={t('imageScale')}>
-                        <ZoomImageButton
-                          direction="out"
-                          disabled={isProcessingBack || backSettings.imageScale <= MIN_IMAGE_SCALE}
-                          label={t('zoomOut', { side: t('backID') })}
-                          onClick={() => setBackSettings((settings) => ({
-                            ...settings,
-                            imageScale: clampImageScale(settings.imageScale - IMAGE_SCALE_STEP),
-                          }))}
-                        />
-                        <output className="min-w-12 text-center text-sm tabular-nums text-gray-300" aria-live="polite">
-                          {(backSettings.imageScale * 100).toFixed(0)}%
-                        </output>
-                        <ZoomImageButton
-                          direction="in"
-                          disabled={isProcessingBack || backSettings.imageScale >= MAX_IMAGE_SCALE}
-                          label={t('zoomIn', { side: t('backID') })}
-                          onClick={() => setBackSettings((settings) => ({
-                            ...settings,
-                            imageScale: clampImageScale(settings.imageScale + IMAGE_SCALE_STEP),
-                          }))}
-                        />
-                      </div>
-                      <ResetWatermarkButton
-                        disabled={!backImageDimensions || isProcessingBack}
-                        label={t('resetWatermark')}
-                        description={t('resetWatermarkForSide', { side: t('backID') })}
-                        onClick={() => handleResetWatermark(false)}
+                        onRotate={(direction) => handleRotateImage(false, direction)}
+                        onReset={() => handleResetWatermark(false)}
                       />
                     </div>
                     <p id="back-touch-hint" className="mt-2 mb-0 text-xs leading-5 text-gray-400 sm:hidden">

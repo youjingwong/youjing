@@ -7,6 +7,8 @@
   "dropImageHere": "Lepaskan imej di sini",
   "frontImageSettings": "Tetapan Imej Hadapan",
   "backImageSettings": "Tetapan Imej Belakang",
+  "imageControls": "Imej",
+  "watermarkControls": "Tanda air",
   "imageScale": "Skala Imej",
   "zoomOut": "Zum keluar {{side}}",
   "zoomIn": "Zum masuk {{side}}",
