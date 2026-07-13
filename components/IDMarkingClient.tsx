@@ -367,6 +367,28 @@ const processImage = (
   const width = sourceWidth * baseScale * settings.imageScale;
   const height = sourceHeight * baseScale * settings.imageScale;
 
+  if (settings.imageScale < DEFAULT_IMAGE_SCALE) {
+    const backdropScale = 1.15;
+    const backdropWidth = sourceWidth * baseScale * backdropScale;
+    const backdropHeight = sourceHeight * baseScale * backdropScale;
+
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate((imageRotation * Math.PI) / 180);
+    ctx.filter = 'blur(48px)';
+    ctx.drawImage(
+      image,
+      -backdropWidth / 2,
+      -backdropHeight / 2,
+      backdropWidth,
+      backdropHeight
+    );
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
   ctx.save();
   ctx.translate(canvas.width / 2, canvas.height / 2);
   ctx.rotate((imageRotation * Math.PI) / 180);
