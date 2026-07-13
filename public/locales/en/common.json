@@ -7,6 +7,8 @@
   "dropImageHere": "Drop image here",
   "frontImageSettings": "Front Image Settings",
   "backImageSettings": "Back Image Settings",
+  "imageControls": "Image",
+  "watermarkControls": "Watermark",
   "imageScale": "Image Scale",
   "zoomOut": "Zoom out {{side}}",
   "zoomIn": "Zoom in {{side}}",

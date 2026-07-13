@@ -7,6 +7,8 @@
   "dropImageHere": "拖放图片到这里",
   "frontImageSettings": "正面图片设置",
   "backImageSettings": "背面图片设置",
+  "imageControls": "图片",
+  "watermarkControls": "水印",
   "imageScale": "图片比例",
   "zoomOut": "缩小{{side}}",
   "zoomIn": "放大{{side}}",
