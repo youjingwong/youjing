@@ -2,6 +2,8 @@
 
 Personal site and the Palang IC browser-based watermarking tool.
 
+The Electron desktop application lives in [`desktop/`](desktop/README.md) and is intentionally isolated from the website build.
+
 ## Getting started
 
 Install dependencies and run the development server:

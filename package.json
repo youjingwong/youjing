@@ -5,6 +5,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "desktop:dev": "npm --prefix desktop run dev",
+    "desktop:build": "npm --prefix desktop run build",
+    "desktop:test": "npm --prefix desktop test",
+    "desktop:dist": "npm --prefix desktop run dist",
     "test": "node --experimental-strip-types --test lib/*.spec.mjs",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit"
