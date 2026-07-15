@@ -191,6 +191,11 @@ describe("Palang IC desktop shell", () => {
     await page.getByLabel("Profile name").fill("No Image Yet");
     await page.getByRole("button", { name: "Save" }).click();
     await page.getByText("Add the front image", { exact: true }).waitFor();
+    expect(await page.locator(".editor-layout.no-image").isVisible()).toBe(
+      true,
+    );
+    expect(await page.locator(".empty-image-upload").isVisible()).toBe(true);
+    expect(await page.locator(".controls-panel").isVisible()).toBe(false);
     await page.screenshot({ path: screenshotPath("palang-new-profile.png") });
     expect(
       await page
@@ -254,21 +259,19 @@ describe("Palang IC desktop shell", () => {
         .getByRole("dialog", { name: "Crop and prepare image" })
         .count(),
     ).toBe(0);
-    await page
-      .getByRole("heading", { name: "1 · Front image settings" })
-      .waitFor();
+    await page.getByLabel("Front: Editor controls").waitFor();
     const backChooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "Add back image" }).click();
     await (
       await backChooser
     ).setFiles(path.resolve("../public/og/id-marking.png"));
-    await page
-      .getByRole("heading", { name: "1 · Back image settings" })
-      .waitFor();
+    await page.getByLabel("Back: Editor controls").waitFor();
     const frontEditor = page.locator(
       'article.document-side[data-side="front"]',
     );
     const backEditor = page.locator('article.document-side[data-side="back"]');
+    const frontAdvanced = frontEditor.locator("details.side-advanced-settings");
+    const backAdvanced = backEditor.locator("details.side-advanced-settings");
     const frontControls = frontEditor.getByLabel("Front: Editor controls");
     const backControls = backEditor.getByLabel("Back: Editor controls");
     const frontCanvas = frontEditor.locator(
@@ -285,6 +288,27 @@ describe("Palang IC desktop shell", () => {
       frontCanvas.waitFor(),
       backCanvas.waitFor(),
     ]);
+    const exportPanel = page.locator(".controls-panel");
+    expect(await exportPanel.locator("section").count()).toBe(1);
+    expect(
+      await exportPanel
+        .getByRole("heading", { name: "Export", exact: true })
+        .count(),
+    ).toBe(1);
+    expect(
+      await exportPanel
+        .locator(
+          ".side-image-settings, textarea, input[type=range], input[type=color], input[type=checkbox]",
+        )
+        .count(),
+    ).toBe(0);
+    const frontOnlyExport = exportPanel.getByRole("button", {
+      name: "Front only",
+    });
+    await frontOnlyExport.waitFor();
+    expect(await frontOnlyExport.getAttribute("aria-pressed")).toBe("true");
+    await exportPanel.getByLabel("Format").waitFor();
+    await exportPanel.getByLabel("Quality").waitFor();
     const sideBySideLayout = await page.evaluate(() => {
       function bounds(selector: string) {
         const rect = document.querySelector(selector)!.getBoundingClientRect();
@@ -304,6 +328,12 @@ describe("Palang IC desktop shell", () => {
         backControls: bounds(
           'article.document-side[data-side="back"] .side-editor-tools',
         ),
+        frontAdvanced: bounds(
+          'article.document-side[data-side="front"] .side-advanced-settings',
+        ),
+        backAdvanced: bounds(
+          'article.document-side[data-side="back"] .side-advanced-settings',
+        ),
         frontCanvas: bounds('article.document-side[data-side="front"] canvas'),
         backCanvas: bounds('article.document-side[data-side="back"] canvas'),
       };
@@ -317,6 +347,12 @@ describe("Palang IC desktop shell", () => {
     expect(sideBySideLayout.backControls.bottom).toBeLessThanOrEqual(
       sideBySideLayout.backCanvas.top,
     );
+    expect(sideBySideLayout.frontAdvanced.bottom).toBeLessThanOrEqual(
+      sideBySideLayout.frontCanvas.top,
+    );
+    expect(sideBySideLayout.backAdvanced.bottom).toBeLessThanOrEqual(
+      sideBySideLayout.backCanvas.top,
+    );
 
     const frontSideButton = frontEditor.getByRole("button", {
       name: "Front",
@@ -328,15 +364,9 @@ describe("Palang IC desktop shell", () => {
     });
     await backSideButton.focus();
     await page.keyboard.press("Enter");
-    await page
-      .getByRole("heading", { name: "2 · Back watermark settings" })
-      .waitFor();
     expect(await backSideButton.getAttribute("aria-pressed")).toBe("true");
     await frontSideButton.focus();
     await page.keyboard.press("Enter");
-    await page
-      .getByRole("heading", { name: "2 · Front watermark settings" })
-      .waitFor();
     expect(await frontSideButton.getAttribute("aria-pressed")).toBe("true");
 
     await running.evaluate(({ BrowserWindow }) => {
@@ -363,6 +393,12 @@ describe("Palang IC desktop shell", () => {
         backControls: bounds(
           'article.document-side[data-side="back"] .side-editor-tools',
         ),
+        frontAdvanced: bounds(
+          'article.document-side[data-side="front"] .side-advanced-settings',
+        ),
+        backAdvanced: bounds(
+          'article.document-side[data-side="back"] .side-advanced-settings',
+        ),
         frontCanvas: bounds('article.document-side[data-side="front"] canvas'),
         backCanvas: bounds('article.document-side[data-side="back"] canvas'),
         details: bounds(".controls-panel"),
@@ -381,6 +417,12 @@ describe("Palang IC desktop shell", () => {
     expect(minimumLayout.backControls.bottom).toBeLessThanOrEqual(
       minimumLayout.backCanvas.top,
     );
+    expect(minimumLayout.frontAdvanced.bottom).toBeLessThanOrEqual(
+      minimumLayout.frontCanvas.top,
+    );
+    expect(minimumLayout.backAdvanced.bottom).toBeLessThanOrEqual(
+      minimumLayout.backCanvas.top,
+    );
     expect(minimumLayout.frontCanvas.width).toBeGreaterThan(350);
     expect(minimumLayout.backCanvas.width).toBeGreaterThan(350);
     expect(minimumLayout.details.top).toBeGreaterThanOrEqual(
@@ -390,27 +432,48 @@ describe("Palang IC desktop shell", () => {
     await page.screenshot({
       path: screenshotPath("palang-editor-minimum.png"),
     });
+    await frontAdvanced.locator("summary").click();
+    const minimumExpanded = await page.evaluate(() => {
+      const settings = document
+        .querySelector(
+          'article.document-side[data-side="front"] .side-advanced-settings',
+        )!
+        .getBoundingClientRect();
+      const canvas = document
+        .querySelector('article.document-side[data-side="front"] canvas')!
+        .getBoundingClientRect();
+      return {
+        settingsBottom: settings.bottom,
+        canvasTop: canvas.top,
+        canScrollX:
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      };
+    });
+    expect(minimumExpanded.settingsBottom).toBeLessThanOrEqual(
+      minimumExpanded.canvasTop,
+    );
+    expect(minimumExpanded.canScrollX).toBe(false);
+    await page.screenshot({
+      path: screenshotPath("palang-editor-minimum-settings.png"),
+    });
+    await frontAdvanced.locator("summary").click();
     await running.evaluate(({ BrowserWindow }) => {
       BrowserWindow.getAllWindows()[0]?.setContentSize(1280, 788);
     });
     await expect.poll(() => page.evaluate(() => innerWidth)).toBe(1280);
 
     await frontSideButton.click();
-    await page
-      .getByRole("heading", { name: "2 · Front watermark settings" })
-      .waitFor();
     const frontQuickWatermark = frontEditor.getByLabel("Edit Front watermark");
+    const backQuickWatermark = backEditor.getByLabel("Edit Back watermark");
     await frontQuickWatermark.fill("FIRST LINE\nSECOND LINE");
     expect(await frontQuickWatermark.inputValue()).toBe(
-      "FIRST LINE\nSECOND LINE",
-    );
-    expect(await page.getByLabel("Watermark text").inputValue()).toBe(
       "FIRST LINE\nSECOND LINE",
     );
     await page.screenshot({
       path: screenshotPath("palang-multiline-watermark.png"),
     });
-    await page.getByLabel("Watermark text").fill("FRONT ONLY");
+    await frontQuickWatermark.fill("FRONT ONLY");
     const frontImageZoom = frontEditor.getByRole("slider", {
       name: "Front image zoom",
     });
@@ -428,43 +491,120 @@ describe("Palang IC desktop shell", () => {
     expect(await frontColour.inputValue()).toBe("#244c3b");
     expect(await backColour.inputValue()).toBe("#111827");
     await frontImageZoom.fill("1");
-    await page.getByRole("button", { name: "Copy watermark to back" }).click();
-    await page.locator(".controls-panel").evaluate((panel) => {
-      panel.scrollTop = panel.scrollHeight;
-    });
-    await backEditor.locator(".document-side-heading").click();
-    await expect
-      .poll(() =>
-        page.locator(".controls-panel").evaluate((panel) => panel.scrollTop),
-      )
-      .toBe(0);
-    await page
-      .getByRole("heading", { name: "1 · Back image settings" })
+    await frontAdvanced.locator("summary").click();
+    expect(await frontAdvanced.getAttribute("open")).not.toBeNull();
+    await backAdvanced.locator("summary").click();
+    expect(await backAdvanced.getAttribute("open")).not.toBeNull();
+    for (const name of [
+      "Crop and prepare image",
+      "Replace image",
+      "Paste image",
+    ])
+      await frontControls
+        .getByRole("button", { name: `Front: ${name}` })
+        .waitFor();
+    expect(
+      await frontAdvanced.locator("summary").getAttribute("aria-label"),
+    ).toBe("Front: More watermark settings");
+    expect(
+      await backAdvanced.locator("summary").getAttribute("aria-label"),
+    ).toBe("Back: More watermark settings");
+    await frontAdvanced.getByLabel("Front presets").waitFor();
+    const backPresetSelect = backAdvanced.getByLabel("Back presets");
+    expect(await backPresetSelect.locator("option").count()).toBeGreaterThan(1);
+    await backPresetSelect.selectOption({ index: 1 });
+    expect(await backPresetSelect.inputValue()).not.toBe("");
+    await frontAdvanced
+      .getByRole("button", { name: "Front: Save as preset" })
       .waitFor();
-    await page
-      .getByRole("heading", { name: "2 · Back watermark settings" })
+    await frontAdvanced
+      .getByRole("slider", { name: "Front opacity" })
       .waitFor();
-    const backPanelZoom = page.getByRole("slider", {
-      name: "Image zoom",
-      exact: true,
+    await frontAdvanced.getByLabel("Front alignment").waitFor();
+    await frontAdvanced
+      .getByRole("slider", { name: "Front line spacing" })
+      .waitFor();
+    await frontAdvanced.getByLabel("Front uppercase").waitFor();
+    await frontAdvanced.getByLabel("Front add today’s date").waitFor();
+    await frontAdvanced
+      .getByRole("checkbox", { name: "Front crossing lines", exact: true })
+      .waitFor();
+    await frontAdvanced
+      .getByRole("group", { name: "Front: Crossing line controls" })
+      .waitFor();
+    const frontOpacity = frontEditor.getByRole("slider", {
+      name: "Front opacity",
     });
-    await page.screenshot({ path: screenshotPath("palang-back-settings.png") });
-    await backPanelZoom.fill("85");
-    expect(await backPanelZoom.inputValue()).toBe("85");
-    expect(await page.getByLabel("Watermark text").inputValue()).toBe(
-      "FRONT ONLY",
+    const backOpacity = backEditor.getByRole("slider", {
+      name: "Back opacity",
+    });
+    const backOpacityBeforeCopy = await backOpacity.inputValue();
+    const frontAlignment = frontEditor.getByLabel("Front alignment");
+    const backAlignment = backEditor.getByLabel("Back alignment");
+    const backAlignmentBeforeCopy = await backAlignment.inputValue();
+    const frontLineThickness = frontEditor.getByRole("slider", {
+      name: "Front line thickness",
+    });
+    const backLineThickness = backEditor.getByRole("slider", {
+      name: "Back line thickness",
+    });
+    const backThicknessBeforeCopy = await backLineThickness.inputValue();
+    await frontOpacity.fill("64");
+    await frontAlignment.selectOption("right");
+    await frontLineThickness.fill("7");
+    expect(await backOpacity.inputValue()).toBe(backOpacityBeforeCopy);
+    expect(await backAlignment.inputValue()).toBe(backAlignmentBeforeCopy);
+    expect(await backLineThickness.inputValue()).toBe(backThicknessBeforeCopy);
+    await frontAdvanced
+      .getByRole("button", { name: "Front: Copy watermark to back" })
+      .click();
+    expect(await backQuickWatermark.inputValue()).toBe("FRONT ONLY");
+    expect(await backColour.inputValue()).toBe("#244c3b");
+    expect(await backOpacity.inputValue()).toBe("64");
+    expect(await backAlignment.inputValue()).toBe("right");
+    expect(await backLineThickness.inputValue()).toBe("7");
+    expect(await backImageZoom.inputValue()).toBe("1");
+    expect(await backPresetSelect.inputValue()).toBe("");
+    await backControls
+      .getByRole("button", { name: "Back: Remove back" })
+      .waitFor();
+    const expandedOrdering = await page.evaluate(() => {
+      const bottom = (selector: string) =>
+        document.querySelector(selector)!.getBoundingClientRect().bottom;
+      const top = (selector: string) =>
+        document.querySelector(selector)!.getBoundingClientRect().top;
+      return {
+        front: {
+          settings: bottom(
+            'article.document-side[data-side="front"] .side-advanced-settings',
+          ),
+          canvas: top('article.document-side[data-side="front"] canvas'),
+        },
+        back: {
+          settings: bottom(
+            'article.document-side[data-side="back"] .side-advanced-settings',
+          ),
+          canvas: top('article.document-side[data-side="back"] canvas'),
+        },
+      };
+    });
+    expect(expandedOrdering.front.settings).toBeLessThanOrEqual(
+      expandedOrdering.front.canvas,
     );
-    expect(await backImageZoom.inputValue()).toBe("0.85");
+    expect(expandedOrdering.back.settings).toBeLessThanOrEqual(
+      expandedOrdering.back.canvas,
+    );
+    await page.screenshot({
+      path: screenshotPath("palang-settings-above.png"),
+    });
+    await frontAdvanced.locator("summary").click();
+    await backAdvanced.locator("summary").click();
     await backImageZoom.fill("0.9");
-    expect(await backPanelZoom.inputValue()).toBe("90");
     expect(await frontImageZoom.inputValue()).toBe("1");
-    await page.getByLabel("Watermark text").fill("BACK ONLY");
-    await frontEditor.locator(".document-side-heading").click();
+    await backQuickWatermark.fill("BACK ONLY");
     expect(await frontImageZoom.inputValue()).toBe("1");
     expect(await backImageZoom.inputValue()).toBe("0.9");
-    expect(await page.getByLabel("Watermark text").inputValue()).toBe(
-      "FRONT ONLY",
-    );
+    expect(await frontQuickWatermark.inputValue()).toBe("FRONT ONLY");
     const rotation = frontEditor.getByRole("slider", {
       name: "Front rotation",
     });
@@ -552,7 +692,7 @@ describe("Palang IC desktop shell", () => {
       steps: 4,
     });
     await page.mouse.up();
-    await page.getByLabel("Watermark text").fill("CONFIDENTIAL COPY");
+    await frontQuickWatermark.fill("CONFIDENTIAL COPY");
     await rotation.fill("18");
     const persistedZoom = (await zoom.textContent())?.match(/\d+%/)?.[0];
     const persistedSize = await size.inputValue();
@@ -592,9 +732,7 @@ describe("Palang IC desktop shell", () => {
       .toBe(90);
     await page.getByRole("button", { name: /Back to profiles/ }).click();
     await page.getByText("Gesture Test", { exact: true }).click();
-    expect(await page.getByLabel("Watermark text").inputValue()).toBe(
-      "CONFIDENTIAL COPY",
-    );
+    expect(await frontQuickWatermark.inputValue()).toBe("CONFIDENTIAL COPY");
     expect(
       await frontEditor
         .getByRole("slider", { name: "Front rotation" })
@@ -623,14 +761,12 @@ describe("Palang IC desktop shell", () => {
           ?.frontEditorState?.imageRotation;
       })
       .toBe(0);
-    await backEditor.locator(".document-side-heading").click();
-    expect(await page.getByLabel("Watermark text").inputValue()).toBe(
-      "BACK ONLY",
-    );
+    await backSideButton.click();
+    expect(await backQuickWatermark.inputValue()).toBe("BACK ONLY");
     expect(
       await page.getByRole("slider", { name: "Back image zoom" }).inputValue(),
     ).toBe("0.9");
-    await frontEditor.locator(".document-side-heading").click();
+    await frontSideButton.click();
     await zoom.getByText(persistedZoom!).waitFor();
     const fit = await page.evaluate(() => {
       const tools = document

@@ -46,6 +46,8 @@ type Screen =
   | { kind: "editor"; profile: ProfileWithImages }
   | { kind: "settings" };
 
+type EditorSide = "front" | "back";
+
 export default function App() {
   const [vault, setVault] = useState<VaultData | null>(null);
   const [locked, setLocked] = useState(true);
@@ -522,7 +524,7 @@ function Editor({
   onVaultChange: (v: VaultData) => void;
   onError: (value: string) => void;
 }) {
-  const [side, setSide] = useState<"front" | "back">("front");
+  const [side, setSide] = useState<EditorSide>("front");
   const [front, setFront] = useState<WatermarkSettings>(() => ({
     ...structuredClone(
       profile.frontEditorState?.watermark || vault.settings.defaultWatermark,
@@ -565,7 +567,9 @@ function Editor({
     vault.settings.defaultExportQuality,
   );
   const [busy, setBusy] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState("");
+  const [selectedPresets, setSelectedPresets] = useState<
+    Record<EditorSide, string>
+  >({ front: "", back: "" });
   const [preparing, setPreparing] = useState<{
     side: "front" | "back";
     dataUrl: string;
@@ -574,42 +578,33 @@ function Editor({
     null,
   );
   const [lastExport, setLastExport] = useState<string | null>(null);
-  const controlsPanelRef = useRef<HTMLElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const imageInputSide = useRef<"front" | "back">("front");
-  const settings = side === "front" ? front : back;
-  const activeSideLabel = side === "front" ? t("front") : t("backSide");
-  const imageScale = imageScales[side];
+  const imageInputSide = useRef<EditorSide>("front");
   const updateSide = (
-    target: "front" | "back",
+    target: EditorSide,
     changes: Partial<WatermarkSettings>,
   ) => {
     const setter = target === "front" ? setFront : setBack;
     setter((current) => ({ ...current, ...changes }));
   };
-  const update = (changes: Partial<WatermarkSettings>) =>
-    updateSide(side, changes);
-  const rotateWatermark = (target: "front" | "back", degrees: number) => {
+  const rotateWatermark = (target: EditorSide, degrees: number) => {
     const current = target === "front" ? front : back;
     const rotation =
       ((((current.rotation + degrees + 180) % 360) + 360) % 360) - 180;
     updateSide(target, { rotation });
   };
-  const updateImageScale = (target: "front" | "back", next: number) =>
+  const updateImageScale = (target: EditorSide, next: number) =>
     setImageScales((current) => ({
       ...current,
       [target]: Math.min(3, Math.max(0.5, next)),
     }));
-  const rotateImage = (target: "front" | "back", degrees: -90 | 90) =>
+  const rotateImage = (target: EditorSide, degrees: -90 | 90) =>
     setImageRotations((current) => ({
       ...current,
       [target]: normalizeImageRotation(current[target] + degrees),
     }));
-  const resetWatermark = (target: "front" | "back") =>
+  const resetWatermark = (target: EditorSide) =>
     updateSide(target, structuredClone(vault.settings.defaultWatermark));
-  useEffect(() => {
-    controlsPanelRef.current?.scrollTo({ top: 0, behavior: "auto" });
-  }, [side]);
   async function doExport(copy = false) {
     setBusy(true);
     try {
@@ -721,11 +716,11 @@ function Editor({
       setBusy(false);
     }
   }
-  function chooseImage(target: "front" | "back") {
+  function chooseImage(target: EditorSide) {
     imageInputSide.current = target;
     imageInputRef.current?.click();
   }
-  async function importFile(target: "front" | "back", file: File) {
+  async function importFile(target: EditorSide, file: File) {
     try {
       const changed = await window.palang.importImageBytes(
         profile.id,
@@ -735,26 +730,25 @@ function Editor({
       if (changed) {
         if (changed.qualityWarning) onError(t("qualityWarning"));
         await onProfileChange();
-        setSelectedPreset("");
+        setSelectedPresets((current) => ({ ...current, [target]: "" }));
         setSide(target);
       }
     } catch (cause) {
       onError(readError(cause));
     }
   }
-  async function pasteImage(target: "front" | "back") {
+  async function pasteImage(target: EditorSide) {
     try {
       const changed = await window.palang.pasteImage(profile.id, target);
       if (changed.qualityWarning) onError(t("qualityWarning"));
       await onProfileChange();
-      setSelectedPreset("");
+      setSelectedPresets((current) => ({ ...current, [target]: "" }));
       setSide(target);
     } catch (cause) {
       onError(readError(cause));
     }
   }
-  function activateSide(target: "front" | "back") {
-    setSelectedPreset("");
+  function activateSide(target: EditorSide) {
     setSide(target);
   }
   async function removeBackImage() {
@@ -771,7 +765,28 @@ function Editor({
       onError(readError(cause));
     }
   }
-  async function savePreset(mode: "create" | "update") {
+  function applyPreset(target: EditorSide, presetId: string) {
+    setSelectedPresets((current) => ({ ...current, [target]: presetId }));
+    const preset = vault.presets.find((item) => item.id === presetId);
+    if (!preset) return;
+    const { id: _id, name: _name, ...watermark } = preset;
+    updateSide(target, {
+      ...watermark,
+      text: normalizeLegacyWatermarkText(preset.text),
+    });
+  }
+  function copyWatermarkToOtherSide(target: EditorSide) {
+    const destination = target === "front" ? "back" : "front";
+    if (destination === "back") setBack(structuredClone(front));
+    else setFront(structuredClone(back));
+    setSelectedPresets((current) => ({
+      ...current,
+      [destination]: "",
+    }));
+  }
+  async function savePreset(target: EditorSide, mode: "create" | "update") {
+    const selectedPreset = selectedPresets[target];
+    const settings = target === "front" ? front : back;
     const currentName =
       mode === "update"
         ? vault.presets.find((item) => item.id === selectedPreset)?.name
@@ -792,19 +807,27 @@ function Editor({
         : [...vault.presets, preset];
     try {
       onVaultChange(await window.palang.saveData({ presets }));
-      setSelectedPreset(preset.id);
+      setSelectedPresets((current) => ({
+        ...current,
+        [target]: preset.id,
+      }));
     } catch (cause) {
       onError(readError(cause));
     }
   }
-  async function deletePreset() {
+  async function deletePreset(target: EditorSide) {
+    const selectedPreset = selectedPresets[target];
+    if (!selectedPreset) return;
     try {
       onVaultChange(
         await window.palang.saveData({
           presets: vault.presets.filter((item) => item.id !== selectedPreset),
         }),
       );
-      setSelectedPreset("");
+      setSelectedPresets((current) => ({
+        front: current.front === selectedPreset ? "" : current.front,
+        back: current.back === selectedPreset ? "" : current.back,
+      }));
     } catch (cause) {
       onError(readError(cause));
     }
@@ -878,6 +901,9 @@ function Editor({
                 settings={front}
                 imageScale={imageScales.front}
                 imageRotation={imageRotations.front}
+                presets={vault.presets}
+                selectedPreset={selectedPresets.front}
+                otherSideExists={Boolean(profile.backImageId)}
                 dragging={draggingFile === "front"}
                 t={t}
                 onActivate={() => activateSide("front")}
@@ -895,6 +921,10 @@ function Editor({
                 onRotateImage={(degrees) => rotateImage("front", degrees)}
                 onRotate={(degrees) => rotateWatermark("front", degrees)}
                 onReset={() => resetWatermark("front")}
+                onSelectPreset={(presetId) => applyPreset("front", presetId)}
+                onSavePreset={(mode) => void savePreset("front", mode)}
+                onDeletePreset={() => void deletePreset("front")}
+                onCopyToOther={() => copyWatermarkToOtherSide("front")}
               />
               <DocumentSideEditor
                 target="back"
@@ -905,6 +935,9 @@ function Editor({
                 settings={back}
                 imageScale={imageScales.back}
                 imageRotation={imageRotations.back}
+                presets={vault.presets}
+                selectedPreset={selectedPresets.back}
+                otherSideExists={Boolean(profile.frontImageId)}
                 dragging={draggingFile === "back"}
                 t={t}
                 onActivate={() => activateSide("back")}
@@ -923,245 +956,22 @@ function Editor({
                 onRotateImage={(degrees) => rotateImage("back", degrees)}
                 onRotate={(degrees) => rotateWatermark("back", degrees)}
                 onReset={() => resetWatermark("back")}
+                onSelectPreset={(presetId) => applyPreset("back", presetId)}
+                onSavePreset={(mode) => void savePreset("back", mode)}
+                onDeletePreset={() => void deletePreset("back")}
+                onCopyToOther={() => copyWatermarkToOtherSide("back")}
                 onRemove={() => void removeBackImage()}
               />
             </div>
           )}
         </section>
-        <aside ref={controlsPanelRef} className="controls-panel">
-          <section className="side-image-settings">
-            <h2>
-              1 · {activeSideLabel} {t("imageSettings")}
-            </h2>
-            <p>{t("imageSettingsNote")}</p>
-            <Range
-              label={t("imageZoom")}
-              value={Math.round(imageScale * 100)}
-              min={50}
-              max={300}
-              suffix="%"
-              onChange={(value) => updateImageScale(side, value / 100)}
-            />
-          </section>
-          <section>
-            <div className="section-heading">
-              <h2>
-                2 · {activeSideLabel} {t("watermarkSettings")}
-              </h2>
-              <select
-                aria-label={t("presets")}
-                value={selectedPreset}
-                onChange={(e) => {
-                  setSelectedPreset(e.target.value);
-                  const preset = vault.presets.find(
-                    (p) => p.id === e.target.value,
-                  );
-                  if (preset) {
-                    const { id: _id, name: _name, ...watermark } = preset;
-                    const next = {
-                      ...watermark,
-                      text: normalizeLegacyWatermarkText(preset.text),
-                    };
-                    update(next);
-                  }
-                }}
-              >
-                <option value="">{t("presets")}…</option>
-                {vault.presets.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="side-settings-banner">
-              <div className="side-settings-copy">
-                <strong>{activeSideLabel}</strong>
-                <span>{t("sideSpecific")}</span>
-              </div>
-              {profile.backImageId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (side === "front") setBack(structuredClone(front));
-                    else setFront(structuredClone(back));
-                  }}
-                >
-                  {side === "front" ? t("copyToBack") : t("copyToFront")}
-                </button>
-              )}
-            </div>
-            <div className="preset-actions">
-              <button onClick={() => void savePreset("create")}>
-                ＋ {t("savePreset")}
-              </button>
-              {selectedPreset && (
-                <>
-                  <button onClick={() => void savePreset("update")}>
-                    {t("updatePreset")}
-                  </button>
-                  <button
-                    className="danger-text"
-                    onClick={() => void deletePreset()}
-                  >
-                    {t("deletePreset")}
-                  </button>
-                </>
-              )}
-            </div>
-            <label>
-              {t("watermark")}
-              <textarea
-                rows={3}
-                maxLength={1000}
-                value={settings.text}
-                onChange={(e) => {
-                  update({ text: e.target.value });
-                }}
-              />
-            </label>
-            <div className="control-grid">
-              <Range
-                label={t("opacity")}
-                value={Math.round(settings.opacity * 100)}
-                min={10}
-                max={100}
-                suffix="%"
-                onChange={(v) => update({ opacity: v / 100 })}
-              />
-              <label>
-                {t("color")}
-                <input
-                  className="color"
-                  type="color"
-                  value={settings.color}
-                  onChange={(e) => update({ color: e.target.value })}
-                />
-              </label>
-              <label>
-                {t("textAlign")}
-                <select
-                  value={settings.align}
-                  onChange={(e) =>
-                    update({
-                      align: e.target.value as WatermarkSettings["align"],
-                    })
-                  }
-                >
-                  <option value="left">{t("alignLeft")}</option>
-                  <option value="center">{t("alignCenter")}</option>
-                  <option value="right">{t("alignRight")}</option>
-                </select>
-              </label>
-              <Range
-                label={t("lineSpacing")}
-                value={Math.round(settings.lineHeight * 100)}
-                min={80}
-                max={200}
-                suffix="%"
-                onChange={(v) => update({ lineHeight: v / 100 })}
-              />
-            </div>
-            <div className="check-row">
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={settings.uppercase}
-                  onChange={(e) => update({ uppercase: e.target.checked })}
-                />
-                {t("uppercase")}
-              </label>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={settings.dateEnabled}
-                  onChange={(e) => update({ dateEnabled: e.target.checked })}
-                />
-                {t("date")}
-              </label>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={settings.crossingLines.enabled}
-                  onChange={(e) =>
-                    update({
-                      crossingLines: {
-                        ...settings.crossingLines,
-                        enabled: e.target.checked,
-                      },
-                    })
-                  }
-                />
-                {t("lines")}
-              </label>
-            </div>
-            {settings.crossingLines.enabled && (
-              <div className="control-grid crossing-controls">
-                <Range
-                  label={t("lineThickness")}
-                  value={settings.crossingLines.thickness}
-                  min={1}
-                  max={20}
-                  onChange={(thickness) =>
-                    update({
-                      crossingLines: { ...settings.crossingLines, thickness },
-                    })
-                  }
-                />
-                <Range
-                  label={t("lineOpacity")}
-                  value={Math.round(settings.crossingLines.opacity * 100)}
-                  min={10}
-                  max={100}
-                  suffix="%"
-                  onChange={(v) =>
-                    update({
-                      crossingLines: {
-                        ...settings.crossingLines,
-                        opacity: v / 100,
-                      },
-                    })
-                  }
-                />
-                <Range
-                  label={t("lineWidth")}
-                  value={Math.round(settings.crossingLines.scale * 100)}
-                  min={20}
-                  max={100}
-                  suffix="%"
-                  onChange={(v) =>
-                    update({
-                      crossingLines: {
-                        ...settings.crossingLines,
-                        scale: v / 100,
-                      },
-                    })
-                  }
-                />
-                <label>
-                  {t("color")}
-                  <input
-                    className="color"
-                    type="color"
-                    value={settings.crossingLines.color}
-                    onChange={(e) =>
-                      update({
-                        crossingLines: {
-                          ...settings.crossingLines,
-                          color: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </label>
-              </div>
-            )}
-          </section>
+        <aside className="controls-panel export-panel">
           <section className="export-section">
-            <h2>3 · {t("export")}</h2>
+            <h2>{t("export")}</h2>
             <div className="segmented">
               <button
                 className={exportMode === "front" ? "active" : ""}
+                aria-pressed={exportMode === "front"}
                 onClick={() => setExportMode("front")}
               >
                 {t("frontOnly")}
@@ -1170,12 +980,14 @@ function Editor({
                 <>
                   <button
                     className={exportMode === "back" ? "active" : ""}
+                    aria-pressed={exportMode === "back"}
                     onClick={() => setExportMode("back")}
                   >
                     {t("backOnly")}
                   </button>
                   <button
                     className={exportMode === "combined" ? "active" : ""}
+                    aria-pressed={exportMode === "combined"}
                     onClick={() => setExportMode("combined")}
                   >
                     {t("combined")}
@@ -1183,6 +995,7 @@ function Editor({
                   {format !== "pdf" && (
                     <button
                       className={exportMode === "separate" ? "active" : ""}
+                      aria-pressed={exportMode === "separate"}
                       onClick={() => setExportMode("separate")}
                     >
                       {t("separate")}
@@ -1285,6 +1098,9 @@ function DocumentSideEditor({
   settings,
   imageScale,
   imageRotation,
+  presets,
+  selectedPreset,
+  otherSideExists,
   dragging,
   t,
   onActivate,
@@ -1298,9 +1114,13 @@ function DocumentSideEditor({
   onRotateImage,
   onRotate,
   onReset,
+  onSelectPreset,
+  onSavePreset,
+  onDeletePreset,
+  onCopyToOther,
   onRemove,
 }: {
-  target: "front" | "back";
+  target: EditorSide;
   label: string;
   active: boolean;
   exists: boolean;
@@ -1308,6 +1128,9 @@ function DocumentSideEditor({
   settings: WatermarkSettings;
   imageScale: number;
   imageRotation: ImageRotation;
+  presets: WatermarkPreset[];
+  selectedPreset: string;
+  otherSideExists: boolean;
   dragging: boolean;
   t: T;
   onActivate: () => void;
@@ -1321,6 +1144,10 @@ function DocumentSideEditor({
   onRotateImage: (degrees: -90 | 90) => void;
   onRotate: (degrees: number) => void;
   onReset: () => void;
+  onSelectPreset: (presetId: string) => void;
+  onSavePreset: (mode: "create" | "update") => void;
+  onDeletePreset: () => void;
+  onCopyToOther: () => void;
   onRemove?: () => void;
 }) {
   function drop(event: ReactDragEvent<HTMLElement>) {
@@ -1438,6 +1265,41 @@ function DocumentSideEditor({
               </div>
             </div>
             <div
+              className="editor-tool-row image-action-row"
+              role="group"
+              aria-label={`${label}: ${t("imageActions")}`}
+            >
+              <span className="editor-tool-label">
+                <EditorIcon name="crop" />
+                {t("imageActions")}
+              </span>
+              <button
+                aria-label={`${label}: ${t("prepareImage")}`}
+                disabled={!dataUrl}
+                onClick={onPrepare}
+              >
+                ✂ {t("prepareImage")}
+              </button>
+              <button
+                aria-label={`${label}: ${t("replace")}`}
+                onClick={onChoose}
+              >
+                ↻ {t("replace")}
+              </button>
+              <button aria-label={`${label}: ${t("paste")}`} onClick={onPaste}>
+                ⌘ {t("paste")}
+              </button>
+              {onRemove && (
+                <button
+                  className="danger-text"
+                  aria-label={`${label}: ${t("removeBack")}`}
+                  onClick={onRemove}
+                >
+                  {t("removeBack")}
+                </button>
+              )}
+            </div>
+            <div
               className="editor-tool-row watermark-tool-row"
               role="group"
               aria-label={`${label}: ${t("watermarkControl")}`}
@@ -1525,6 +1387,218 @@ function DocumentSideEditor({
               </button>
             </div>
           </div>
+          <details className="side-advanced-settings">
+            <summary aria-label={`${label}: ${t("moreWatermarkSettings")}`}>
+              <span>{t("moreWatermarkSettings")}</span>
+              <small>{t("sideSpecific")}</small>
+            </summary>
+            <div className="advanced-settings-body">
+              <div className="advanced-preset-row">
+                <label className="preset-select">
+                  {t("presets")}
+                  <select
+                    aria-label={`${label} ${t("presets").toLowerCase()}`}
+                    value={selectedPreset}
+                    onChange={(event) => onSelectPreset(event.target.value)}
+                  >
+                    <option value="">{t("presets")}…</option>
+                    {presets.map((preset) => (
+                      <option key={preset.id} value={preset.id}>
+                        {preset.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {otherSideExists && (
+                  <button
+                    type="button"
+                    aria-label={`${label}: ${
+                      target === "front" ? t("copyToBack") : t("copyToFront")
+                    }`}
+                    onClick={onCopyToOther}
+                  >
+                    {target === "front" ? t("copyToBack") : t("copyToFront")}
+                  </button>
+                )}
+              </div>
+              <div className="preset-actions">
+                <button
+                  aria-label={`${label}: ${t("savePreset")}`}
+                  onClick={() => onSavePreset("create")}
+                >
+                  ＋ {t("savePreset")}
+                </button>
+                {selectedPreset && (
+                  <>
+                    <button
+                      aria-label={`${label}: ${t("updatePreset")}`}
+                      onClick={() => onSavePreset("update")}
+                    >
+                      {t("updatePreset")}
+                    </button>
+                    <button
+                      className="danger-text"
+                      aria-label={`${label}: ${t("deletePreset")}`}
+                      onClick={onDeletePreset}
+                    >
+                      {t("deletePreset")}
+                    </button>
+                  </>
+                )}
+              </div>
+              <div className="side-control-grid">
+                <Range
+                  label={t("opacity")}
+                  ariaLabel={`${label} ${t("opacity").toLowerCase()}`}
+                  value={Math.round(settings.opacity * 100)}
+                  min={10}
+                  max={100}
+                  suffix="%"
+                  onChange={(opacity) => onSettings({ opacity: opacity / 100 })}
+                />
+                <label>
+                  {t("textAlign")}
+                  <select
+                    aria-label={`${label} ${t("textAlign").toLowerCase()}`}
+                    value={settings.align}
+                    onChange={(event) =>
+                      onSettings({
+                        align: event.target.value as WatermarkSettings["align"],
+                      })
+                    }
+                  >
+                    <option value="left">{t("alignLeft")}</option>
+                    <option value="center">{t("alignCenter")}</option>
+                    <option value="right">{t("alignRight")}</option>
+                  </select>
+                </label>
+                <Range
+                  label={t("lineSpacing")}
+                  ariaLabel={`${label} ${t("lineSpacing").toLowerCase()}`}
+                  value={Math.round(settings.lineHeight * 100)}
+                  min={80}
+                  max={200}
+                  suffix="%"
+                  onChange={(lineHeight) =>
+                    onSettings({ lineHeight: lineHeight / 100 })
+                  }
+                />
+              </div>
+              <div className="check-row side-check-row">
+                <label className="check">
+                  <input
+                    aria-label={`${label} ${t("uppercase").toLowerCase()}`}
+                    type="checkbox"
+                    checked={settings.uppercase}
+                    onChange={(event) =>
+                      onSettings({ uppercase: event.target.checked })
+                    }
+                  />
+                  {t("uppercase")}
+                </label>
+                <label className="check">
+                  <input
+                    aria-label={`${label} ${t("date").toLowerCase()}`}
+                    type="checkbox"
+                    checked={settings.dateEnabled}
+                    onChange={(event) =>
+                      onSettings({ dateEnabled: event.target.checked })
+                    }
+                  />
+                  {t("date")}
+                </label>
+                <label className="check">
+                  <input
+                    aria-label={`${label} ${t("lines").toLowerCase()}`}
+                    type="checkbox"
+                    checked={settings.crossingLines.enabled}
+                    onChange={(event) =>
+                      onSettings({
+                        crossingLines: {
+                          ...settings.crossingLines,
+                          enabled: event.target.checked,
+                        },
+                      })
+                    }
+                  />
+                  {t("lines")}
+                </label>
+              </div>
+              {settings.crossingLines.enabled && (
+                <div
+                  className="side-control-grid crossing-controls"
+                  role="group"
+                  aria-label={`${label}: ${t("crossingLineControls")}`}
+                >
+                  <Range
+                    label={t("lineThickness")}
+                    ariaLabel={`${label} ${t("lineThickness").toLowerCase()}`}
+                    value={settings.crossingLines.thickness}
+                    min={1}
+                    max={20}
+                    onChange={(thickness) =>
+                      onSettings({
+                        crossingLines: {
+                          ...settings.crossingLines,
+                          thickness,
+                        },
+                      })
+                    }
+                  />
+                  <Range
+                    label={t("lineOpacity")}
+                    ariaLabel={`${label} ${t("lineOpacity").toLowerCase()}`}
+                    value={Math.round(settings.crossingLines.opacity * 100)}
+                    min={10}
+                    max={100}
+                    suffix="%"
+                    onChange={(opacity) =>
+                      onSettings({
+                        crossingLines: {
+                          ...settings.crossingLines,
+                          opacity: opacity / 100,
+                        },
+                      })
+                    }
+                  />
+                  <Range
+                    label={t("lineWidth")}
+                    ariaLabel={`${label} ${t("lineWidth").toLowerCase()}`}
+                    value={Math.round(settings.crossingLines.scale * 100)}
+                    min={20}
+                    max={100}
+                    suffix="%"
+                    onChange={(scale) =>
+                      onSettings({
+                        crossingLines: {
+                          ...settings.crossingLines,
+                          scale: scale / 100,
+                        },
+                      })
+                    }
+                  />
+                  <label>
+                    {t("color")}
+                    <input
+                      className="color"
+                      aria-label={`${label} ${t("lines").toLowerCase()} ${t("color").toLowerCase()}`}
+                      type="color"
+                      value={settings.crossingLines.color}
+                      onChange={(event) =>
+                        onSettings({
+                          crossingLines: {
+                            ...settings.crossingLines,
+                            color: event.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+              )}
+            </div>
+          </details>
+          <p className="drop-hint above-image-hint">{t("dropHint")}</p>
           <p id={`${target}-watermark-gestures`} className="sr-only">
             {t("watermarkGesturesHint")}
           </p>
@@ -1551,19 +1625,6 @@ function DocumentSideEditor({
               </button>
             </div>
           )}
-          <p className="drop-hint">{t("dropHint")}</p>
-          <div className="image-actions">
-            <button disabled={!dataUrl} onClick={onPrepare}>
-              ✂ {t("prepareImage")}
-            </button>
-            <button onClick={onChoose}>↻ {t("replace")}</button>
-            <button onClick={onPaste}>⌘ {t("paste")}</button>
-            {onRemove && (
-              <button className="danger-text" onClick={onRemove}>
-                {t("removeBack")}
-              </button>
-            )}
-          </div>
         </>
       )}
     </article>
@@ -2600,6 +2661,7 @@ function Modal({
 }
 function Range({
   label,
+  ariaLabel,
   value,
   min,
   max,
@@ -2607,6 +2669,7 @@ function Range({
   onChange,
 }: {
   label: string;
+  ariaLabel?: string;
   value: number;
   min: number;
   max: number;
@@ -2618,6 +2681,7 @@ function Range({
       {label}
       <div className="range-row">
         <input
+          aria-label={ariaLabel}
           type="range"
           min={min}
           max={max}

@@ -514,7 +514,7 @@ label {
 .editor-layout {
   height: calc(100vh - 70px);
   display: grid;
-  grid-template-columns: minmax(480px, 1.3fr) minmax(390px, 0.8fr);
+  grid-template-columns: minmax(640px, 1fr) minmax(280px, 320px);
 }
 .editor-layout.no-image {
   grid-template-columns: 1fr;
@@ -525,7 +525,7 @@ label {
 }
 .preview-panel {
   min-width: 0;
-  padding: 22px 30px;
+  padding: 22px 24px;
   background: var(--preview);
   display: flex;
   flex-direction: column;
@@ -660,6 +660,18 @@ label {
 }
 .side-editor-tools .tool-slider output {
   min-width: 34px;
+}
+.image-action-row button {
+  padding: 6px 8px;
+  color: #dce5e0;
+  background: #25312b;
+  border-color: #44534b;
+  font-size: 10px;
+}
+.image-action-row button:hover {
+  color: white;
+  background: #334139;
+  border-color: #68786f;
 }
 .watermark-tool-icon {
   width: 22px;
@@ -878,6 +890,9 @@ label {
   font-size: 11px;
   text-align: center;
 }
+.above-image-hint {
+  margin: 0 0 9px;
+}
 .corrupt-image {
   max-width: 520px;
   margin: auto;
@@ -891,16 +906,114 @@ label {
 .corrupt-image p {
   line-height: 1.5;
 }
-.image-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  padding-top: 10px;
-}
-.image-actions button {
+.side-advanced-settings {
+  width: 100%;
+  margin: 0 0 9px;
+  overflow: hidden;
   background: var(--surface-alpha);
-  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.side-advanced-settings summary {
+  min-height: 38px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+}
+.side-advanced-settings summary::-webkit-details-marker {
+  display: none;
+}
+.side-advanced-settings summary::before {
+  content: "›";
+  flex: none;
+  color: var(--green);
+  font-size: 18px;
+  line-height: 1;
+  transform: rotate(0deg);
+  transition: transform 0.15s;
+}
+.side-advanced-settings[open] summary::before {
+  transform: rotate(90deg);
+}
+.side-advanced-settings summary > span {
+  flex: 1;
+}
+.side-advanced-settings summary small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
+  text-align: right;
+}
+.side-advanced-settings[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+.advanced-settings-body {
+  padding: 10px;
+}
+.advanced-preset-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+.advanced-preset-row button {
+  padding: 7px 8px;
+  white-space: nowrap;
+  font-size: 9px;
+}
+.preset-select {
+  min-width: 0;
+}
+.preset-select select {
+  min-width: 0;
+  width: 100%;
+  margin-top: 4px;
+  padding: 7px;
+  font-size: 10px;
+}
+.side-control-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px 12px;
+  margin-top: 10px;
+}
+.side-control-grid > label {
+  min-width: 0;
+  font-size: 10px;
+}
+.side-control-grid select,
+.side-control-grid .color {
+  margin-top: 4px;
+}
+.side-control-grid .range-row {
+  gap: 5px;
+  margin-top: 4px;
+}
+.side-control-grid .range-row input {
+  min-width: 0;
+  width: 100%;
+}
+.side-control-grid .range-row output {
+  width: 34px;
+  font-size: 9px;
+}
+.side-check-row {
+  margin-top: 6px;
+  gap: 2px 10px;
+}
+.side-check-row .check {
+  margin-top: 7px;
+  font-size: 10px;
+}
+.side-check-row .check input {
+  width: 14px;
+  height: 14px;
 }
 .controls-panel {
   background: var(--surface);
@@ -917,67 +1030,16 @@ label {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.side-image-settings p {
-  margin: -8px 0 13px;
-  color: var(--muted);
-  font-size: 11px;
-}
-.side-image-settings .range-row input {
-  flex: 1;
-}
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
-.section-heading {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-}
-.section-heading select {
-  width: 170px;
-  margin: 0 0 10px;
-  font-size: 11px;
-  padding: 7px;
-}
-.side-settings-banner {
-  margin: -4px 0 14px;
-  padding: 9px 10px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  background: var(--surface-soft);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-}
-.side-settings-copy {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.side-settings-copy strong {
-  color: var(--ink);
-  font-size: 12px;
-}
-.side-settings-copy span {
-  color: var(--muted);
-  font-size: 10px;
-}
-.side-settings-banner button {
-  flex: none;
-  padding: 6px 8px;
-  white-space: nowrap;
-  font-size: 10px;
-}
 .preset-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin: -6px 0 12px;
+  margin: 8px 0 0;
 }
 .preset-actions button {
   padding: 6px 8px;
@@ -1001,15 +1063,9 @@ label {
   flex-wrap: wrap;
   gap: 4px 15px;
 }
-.control-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 13px 16px;
-  margin-top: 15px;
-}
 .crossing-controls {
-  margin-top: 10px;
-  padding: 12px;
+  margin-top: 8px;
+  padding: 9px;
   border-radius: 9px;
   background: var(--surface-soft);
 }
