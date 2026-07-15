@@ -260,6 +260,7 @@ export class VaultService {
     profileId: string,
     side: ImageSide,
     input: Buffer,
+    editorState?: ProfileEditorStateUpdate,
   ): Promise<ImageInfo> {
     assertId(profileId);
     if (
@@ -315,6 +316,12 @@ export class VaultService {
       oldId = side === "front" ? profile.frontImageId : profile.backImageId;
       if (side === "front") profile.frontImageId = id;
       else profile.backImageId = id;
+      if (editorState) {
+        profile.frontEditorState = structuredClone(editorState.front);
+        if (profile.backImageId && editorState.back)
+          profile.backEditorState = structuredClone(editorState.back);
+        else delete profile.backEditorState;
+      }
       vault.images = vault.images.filter((item) => item.id !== oldId);
       vault.images.push(info);
       profile.updatedAt = now;

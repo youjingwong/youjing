@@ -15,6 +15,7 @@ vi.mock("electron", () => ({
 }));
 
 import { VaultService } from "./vault";
+import { defaultWatermark } from "../shared/defaults";
 
 describe("VaultService integration", () => {
   let testRoot: string;
@@ -107,8 +108,20 @@ describe("VaultService integration", () => {
       profile.id,
       "front",
       await solidPng(640, 400, { r: 220, g: 30, b: 10 }),
+      {
+        front: {
+          watermark: structuredClone(defaultWatermark),
+          imageScale: 1,
+          imageRotation: 0,
+        },
+      },
     );
     const back = await vault.importImageBytes(profile.id, "back", backBytes);
+    expect((await vault.list()).profiles[0].frontEditorState).toMatchObject({
+      imageScale: 1,
+      imageRotation: 0,
+      watermark: defaultWatermark,
+    });
     const frontPath = path.join(testRoot, "images", `${front.id}.enc`);
     const backPath = path.join(testRoot, "images", `${back.id}.enc`);
 

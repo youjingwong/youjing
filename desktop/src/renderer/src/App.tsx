@@ -1068,15 +1068,37 @@ function Editor({
       {preparing && (
         <ImagePreparationDialog
           dataUrl={preparing.dataUrl}
+          sideLabel={preparing.side === "front" ? t("front") : t("backSide")}
+          initialRotation={imageRotations[preparing.side]}
           t={t}
           onCancel={() => setPreparing(null)}
-          onConfirm={async (dataUrl) => {
+          onConfirm={async (bytes) => {
+            const target = preparing.side;
             try {
+              const nextImageScales = { ...imageScales, [target]: 1 };
+              const nextImageRotations = { ...imageRotations, [target]: 0 };
+              const nextEditorState = {
+                front: {
+                  watermark: structuredClone(front),
+                  imageScale: nextImageScales.front,
+                  imageRotation: nextImageRotations.front,
+                },
+                back: profile.backImageId
+                  ? {
+                      watermark: structuredClone(back),
+                      imageScale: nextImageScales.back,
+                      imageRotation: nextImageRotations.back,
+                    }
+                  : undefined,
+              };
               await window.palang.importImageBytes(
                 profile.id,
-                preparing.side,
-                dataUrlBytes(dataUrl),
+                target,
+                bytes,
+                nextEditorState,
               );
+              setImageScales(nextImageScales);
+              setImageRotations(nextImageRotations);
               await onProfileChange();
               setPreparing(null);
             } catch (cause) {
@@ -1278,7 +1300,8 @@ function DocumentSideEditor({
                 disabled={!dataUrl}
                 onClick={onPrepare}
               >
-                ✂ {t("prepareImage")}
+                <EditorIcon name="crop" />
+                {t("prepareImage")}
               </button>
               <button
                 aria-label={`${label}: ${t("replace")}`}
@@ -2707,10 +2730,4 @@ function formatDate(value: string, language: "en" | "ms") {
 function readError(cause: unknown) {
   const value = cause instanceof Error ? cause.message : String(cause);
   return value.replace(/^Error invoking remote method '[^']+': Error: /, "");
-}
-function dataUrlBytes(dataUrl: string): Uint8Array {
-  const encoded = dataUrl.split(",")[1];
-  if (!encoded) throw new Error("Invalid image");
-  const binary = atob(encoded);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }

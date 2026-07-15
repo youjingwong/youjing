@@ -181,15 +181,30 @@ export function registerIpc(vault: VaultService): void {
   );
   ipcMain.handle(
     "profile:importBytes",
-    async (_event, id: unknown, side: unknown, bytes: unknown) => {
+    async (
+      _event,
+      id: unknown,
+      side: unknown,
+      bytes: unknown,
+      editorState: unknown,
+    ) => {
       assertId(id);
       if (side !== "front" && side !== "back")
         throw new Error("Invalid image side");
       if (!(bytes instanceof Uint8Array) || bytes.byteLength > 50 * 1024 * 1024)
         throw new Error("Invalid image data");
+      const validatedEditorState =
+        editorState === undefined
+          ? undefined
+          : validateProfileEditorState(editorState);
       const input = Buffer.from(bytes);
       return withVault(() =>
-        vault.importImageBytes(id, side as ImageSide, input),
+        vault.importImageBytes(
+          id,
+          side as ImageSide,
+          input,
+          validatedEditorState,
+        ),
       );
     },
   );

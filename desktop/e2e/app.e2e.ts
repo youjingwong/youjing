@@ -198,9 +198,7 @@ describe("Palang IC desktop shell", () => {
     expect(await page.locator(".controls-panel").isVisible()).toBe(false);
     await page.screenshot({ path: screenshotPath("palang-new-profile.png") });
     expect(
-      await page
-        .getByRole("dialog", { name: "Crop and prepare image" })
-        .count(),
+      await page.locator('[data-testid="image-crop-dialog"]').count(),
     ).toBe(0);
     await page.getByRole("button", { name: /Back to profiles/ }).click();
     const emptyProfileCard = page
@@ -255,9 +253,7 @@ describe("Palang IC desktop shell", () => {
       })
       .not.toBe(previousFrontImageId);
     expect(
-      await page
-        .getByRole("dialog", { name: "Crop and prepare image" })
-        .count(),
+      await page.locator('[data-testid="image-crop-dialog"]').count(),
     ).toBe(0);
     await page.getByLabel("Front: Editor controls").waitFor();
     const backChooser = page.waitForEvent("filechooser");
@@ -495,11 +491,7 @@ describe("Palang IC desktop shell", () => {
     expect(await frontAdvanced.getAttribute("open")).not.toBeNull();
     await backAdvanced.locator("summary").click();
     expect(await backAdvanced.getAttribute("open")).not.toBeNull();
-    for (const name of [
-      "Crop and prepare image",
-      "Replace image",
-      "Paste image",
-    ])
+    for (const name of ["Crop", "Replace image", "Paste image"])
       await frontControls
         .getByRole("button", { name: `Front: ${name}` })
         .waitFor();
@@ -805,5 +797,470 @@ describe("Palang IC desktop shell", () => {
     await page.getByRole("group", { name: "Front image zoom" }).waitFor();
     await page.waitForTimeout(1_200);
     await page.screenshot({ path: screenshotPath("palang-editor-dark.png") });
+  }, 60_000);
+
+  it("uses a focused direct-manipulation crop editor", async () => {
+    userData = await mkdtemp(path.join(tmpdir(), "palang-ic-crop-e2e-"));
+    running = await electron.launch({
+      args: ["."],
+      cwd: path.resolve("."),
+      env: { ...process.env, PALANG_IC_USER_DATA: userData },
+    });
+    const page = await running.firstWindow();
+    await page.getByRole("heading", { name: "Your profiles" }).waitFor();
+    const imageBytes = await readFile(
+      path.resolve("../public/og/id-marking.png"),
+    );
+    await page.evaluate(async (bytes) => {
+      const profile = await window.palang.createProfile(
+        "Crop Interaction",
+        "ID",
+      );
+      await window.palang.importImageBytes(
+        profile.id,
+        "front",
+        new Uint8Array(bytes),
+      );
+      await window.palang.importImageBytes(
+        profile.id,
+        "back",
+        new Uint8Array(bytes),
+      );
+    }, Array.from(imageBytes));
+    await page.reload();
+    await page.getByText("Crop Interaction", { exact: true }).click();
+
+    const frontEditor = page.locator(
+      'article.document-side[data-side="front"]',
+    );
+    const backEditor = page.locator('article.document-side[data-side="back"]');
+    const frontCrop = frontEditor.getByRole("button", {
+      name: "Front: Crop",
+    });
+    const before = await page.evaluate(async () => {
+      const profile = (await window.palang.list()).profiles.find(
+        (item) => item.name === "Crop Interaction",
+      )!;
+      return {
+        frontImageId: profile.frontImageId,
+        backImageId: profile.backImageId,
+      };
+    });
+    const frontImageZoom = frontEditor.getByRole("slider", {
+      name: "Front image zoom",
+    });
+    await frontImageZoom.fill("1.2");
+    await frontEditor
+      .getByRole("button", { name: "Front: Rotate image right 90°" })
+      .click();
+    await frontCrop.click();
+
+    let dialog = page.locator('[data-testid="image-crop-dialog"]');
+    await dialog.waitFor();
+    expect(await dialog.getAttribute("aria-label")).toBe("Crop image: Front");
+    expect(await dialog.locator('input[type="range"]').count()).toBe(0);
+    const cropSurface = dialog.locator('[data-testid="crop-surface"]');
+    await expect
+      .poll(() => cropSurface.getAttribute("data-ready"))
+      .toBe("true");
+    await expect
+      .poll(() =>
+        cropSurface.evaluate((element) => element === document.activeElement),
+      )
+      .toBe(true);
+    const initialPreview = await cropSurface.evaluate((element) =>
+      (element as HTMLCanvasElement).toDataURL(),
+    );
+    const zoomIn = dialog.getByRole("button", { name: "Zoom crop in" });
+    await zoomIn.click();
+    await zoomIn.click();
+    await expect
+      .poll(() =>
+        cropSurface.evaluate((element) =>
+          (element as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .not.toBe(initialPreview);
+    const zoomedPreview = await cropSurface.evaluate((element) =>
+      (element as HTMLCanvasElement).toDataURL(),
+    );
+    expect(
+      Number(
+        (await dialog.locator("#crop-zoom-status strong").innerText()).replace(
+          "%",
+          "",
+        ),
+      ),
+    ).toBeGreaterThan(100);
+    const surfaceBounds = await cropSurface.boundingBox();
+    expect(surfaceBounds).not.toBeNull();
+    await page.mouse.move(
+      surfaceBounds!.x + surfaceBounds!.width / 2,
+      surfaceBounds!.y + surfaceBounds!.height / 2,
+    );
+    await page.mouse.wheel(0, 120);
+    await expect
+      .poll(() =>
+        cropSurface.evaluate((element) =>
+          (element as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .not.toBe(zoomedPreview);
+    const wheelPreview = await cropSurface.evaluate((element) =>
+      (element as HTMLCanvasElement).toDataURL(),
+    );
+
+    const pinchCenter = {
+      x: surfaceBounds!.x + surfaceBounds!.width / 2,
+      y: surfaceBounds!.y + surfaceBounds!.height / 2,
+    };
+    await cropSurface.dispatchEvent("pointerdown", {
+      pointerId: 41,
+      pointerType: "touch",
+      isPrimary: true,
+      buttons: 1,
+      clientX: pinchCenter.x - 30,
+      clientY: pinchCenter.y,
+    });
+    await cropSurface.dispatchEvent("pointerdown", {
+      pointerId: 42,
+      pointerType: "touch",
+      buttons: 1,
+      clientX: pinchCenter.x + 30,
+      clientY: pinchCenter.y,
+    });
+    await cropSurface.dispatchEvent("pointermove", {
+      pointerId: 42,
+      pointerType: "touch",
+      buttons: 1,
+      clientX: pinchCenter.x + 70,
+      clientY: pinchCenter.y,
+    });
+    await cropSurface.dispatchEvent("pointerup", {
+      pointerId: 42,
+      pointerType: "touch",
+      clientX: pinchCenter.x + 70,
+      clientY: pinchCenter.y,
+    });
+    await cropSurface.dispatchEvent("pointerup", {
+      pointerId: 41,
+      pointerType: "touch",
+      isPrimary: true,
+      clientX: pinchCenter.x - 30,
+      clientY: pinchCenter.y,
+    });
+    await expect
+      .poll(() =>
+        cropSurface.evaluate((element) =>
+          (element as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .not.toBe(wheelPreview);
+    const pinchPreview = await cropSurface.evaluate((element) =>
+      (element as HTMLCanvasElement).toDataURL(),
+    );
+    await cropSurface.press("ArrowRight");
+    await expect
+      .poll(() =>
+        cropSurface.evaluate((element) =>
+          (element as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .not.toBe(pinchPreview);
+    const keyboardMovedPreview = await cropSurface.evaluate((element) =>
+      (element as HTMLCanvasElement).toDataURL(),
+    );
+    await cropSurface.press("Alt+ArrowRight");
+    await expect
+      .poll(() =>
+        cropSurface.evaluate((element) =>
+          (element as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .not.toBe(keyboardMovedPreview);
+    const idCardRatio = dialog.getByRole("button", { name: "ID card" });
+    await idCardRatio.click();
+    expect(await idCardRatio.getAttribute("aria-pressed")).toBe("true");
+    await zoomIn.click();
+    const dragStartPreview = await cropSurface.evaluate((element) =>
+      (element as HTMLCanvasElement).toDataURL(),
+    );
+    const cropBounds = await cropSurface.boundingBox();
+    expect(cropBounds).not.toBeNull();
+    await page.mouse.move(
+      cropBounds!.x + cropBounds!.width / 2,
+      cropBounds!.y + cropBounds!.height / 2,
+    );
+    await page.mouse.down();
+    await page.mouse.move(
+      cropBounds!.x + cropBounds!.width / 2 + 35,
+      cropBounds!.y + cropBounds!.height / 2 + 18,
+      { steps: 4 },
+    );
+    await page.mouse.up();
+    await expect
+      .poll(() =>
+        cropSurface.evaluate((element) =>
+          (element as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .not.toBe(dragStartPreview);
+    const draggedPreview = await cropSurface.evaluate((element) =>
+      (element as HTMLCanvasElement).toDataURL(),
+    );
+    const northWestHandle = await cropSurface.evaluate((element) => {
+      const canvas = element as HTMLCanvasElement;
+      const bounds = canvas.getBoundingClientRect();
+      return {
+        x: bounds.left + Number(canvas.dataset.cropX) * bounds.width,
+        y: bounds.top + Number(canvas.dataset.cropY) * bounds.height,
+      };
+    });
+    await page.mouse.move(northWestHandle.x, northWestHandle.y);
+    await page.mouse.down();
+    await page.mouse.move(northWestHandle.x + 28, northWestHandle.y + 20, {
+      steps: 4,
+    });
+    await page.mouse.up();
+    await expect
+      .poll(() =>
+        cropSurface.evaluate((element) =>
+          (element as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .not.toBe(draggedPreview);
+
+    await dialog.getByRole("button", { name: "Rotate right" }).click();
+    const flipped = dialog.getByRole("button", {
+      name: "Flip horizontally",
+    });
+    await flipped.click();
+    expect(await flipped.getAttribute("aria-pressed")).toBe("true");
+    await dialog.getByRole("button", { name: "Reset" }).click();
+    expect(await flipped.getAttribute("aria-pressed")).toBe("false");
+    await expect
+      .poll(() =>
+        cropSurface.evaluate((element) =>
+          (element as HTMLCanvasElement).toDataURL(),
+        ),
+      )
+      .toBe(initialPreview);
+    for (let index = 0; index < 24 && (await zoomIn.isEnabled()); index += 1)
+      await zoomIn.click();
+    const done = dialog.getByRole("button", { name: "Done" });
+    await expect.poll(() => done.isDisabled()).toBe(true);
+    await dialog.getByText(/minimum 300 × 180 px/).waitFor();
+    await dialog.getByRole("button", { name: "Full image" }).click();
+    await expect.poll(() => done.isEnabled()).toBe(true);
+    await zoomIn.click();
+    await page.keyboard.press("Escape");
+    await expect.poll(() => dialog.count()).toBe(0);
+    expect(
+      await frontCrop.evaluate((element) => element === document.activeElement),
+    ).toBe(true);
+    expect(await frontImageZoom.inputValue()).toBe("1.2");
+    expect(
+      await page.evaluate(async () => {
+        const profile = (await window.palang.list()).profiles.find(
+          (item) => item.name === "Crop Interaction",
+        )!;
+        return {
+          frontImageId: profile.frontImageId,
+          backImageId: profile.backImageId,
+        };
+      }),
+    ).toEqual(before);
+
+    await frontCrop.click();
+    dialog = page.locator('[data-testid="image-crop-dialog"]');
+    await dialog.waitFor();
+    await expect
+      .poll(() =>
+        dialog
+          .locator('[data-testid="crop-surface"]')
+          .getAttribute("data-ready"),
+      )
+      .toBe("true");
+    await dialog.getByRole("button", { name: "ID card" }).click();
+    await dialog.getByRole("button", { name: "Zoom crop in" }).click();
+    await dialog.getByRole("button", { name: "Rotate left" }).click();
+    await dialog.getByRole("button", { name: "Done" }).click();
+    await dialog.waitFor({ state: "detached", timeout: 10_000 });
+    expect(await frontImageZoom.inputValue()).toBe("1");
+    const after = await page.evaluate(async () => {
+      const profile = (await window.palang.list()).profiles.find(
+        (item) => item.name === "Crop Interaction",
+      )!;
+      return {
+        frontImageId: profile.frontImageId,
+        backImageId: profile.backImageId,
+      };
+    });
+    expect(after.frontImageId).not.toBe(before.frontImageId);
+    expect(after.backImageId).toBe(before.backImageId);
+    const croppedFront = await page.evaluate(async () => {
+      const profile = (await window.palang.list()).profiles.find(
+        (item) => item.name === "Crop Interaction",
+      )!;
+      const opened = await window.palang.openProfile(profile.id);
+      const image = new Image();
+      image.src = opened.frontDataUrl;
+      await image.decode();
+      const sample = document.createElement("canvas");
+      sample.width = 40;
+      sample.height = 40;
+      const context = sample.getContext("2d")!;
+      context.drawImage(image, 0, 0, sample.width, sample.height);
+      const pixels = context.getImageData(
+        0,
+        0,
+        sample.width,
+        sample.height,
+      ).data;
+      const colours = new Set<string>();
+      for (let index = 0; index < pixels.length; index += 4)
+        colours.add(
+          `${pixels[index]}-${pixels[index + 1]}-${pixels[index + 2]}`,
+        );
+      return {
+        width: image.naturalWidth,
+        height: image.naturalHeight,
+        colourCount: colours.size,
+      };
+    });
+    expect(croppedFront.width).toBeGreaterThanOrEqual(300);
+    expect(croppedFront.width).toBeLessThan(1024);
+    expect(croppedFront.height).toBeGreaterThan(croppedFront.width);
+    expect(croppedFront.height).toBeLessThan(1792);
+    expect(croppedFront.height / croppedFront.width).toBeCloseTo(1.586, 1);
+    expect(croppedFront.colourCount).toBeGreaterThan(10);
+
+    await page.getByRole("button", { name: /Back to profiles/ }).click();
+    await page.getByText("Crop Interaction", { exact: true }).click();
+    expect(await frontImageZoom.inputValue()).toBe("1");
+    expect(
+      await page.evaluate(async () => {
+        const profile = (await window.palang.list()).profiles.find(
+          (item) => item.name === "Crop Interaction",
+        )!;
+        return {
+          imageScale: profile.frontEditorState?.imageScale,
+          imageRotation: profile.frontEditorState?.imageRotation,
+        };
+      }),
+    ).toEqual({ imageScale: 1, imageRotation: 0 });
+
+    await running.evaluate(({ BrowserWindow }) => {
+      BrowserWindow.getAllWindows()[0]?.setContentSize(960, 680);
+    });
+    await expect.poll(() => page.evaluate(() => innerWidth)).toBe(960);
+    const backCrop = backEditor.getByRole("button", { name: "Back: Crop" });
+    await backCrop.click();
+    dialog = page.locator('[data-testid="image-crop-dialog"]');
+    await dialog.waitFor();
+    await expect
+      .poll(() =>
+        dialog
+          .locator('[data-testid="crop-surface"]')
+          .getAttribute("data-ready"),
+      )
+      .toBe("true");
+    const minimumFit = await page.evaluate(() => {
+      const modal = document
+        .querySelector(".image-prep-modal")!
+        .getBoundingClientRect();
+      const surface = document
+        .querySelector('[data-testid="crop-surface"]')!
+        .getBoundingClientRect();
+      const cancel = Array.from(document.querySelectorAll("button"))
+        .find((button) => button.textContent?.trim() === "Cancel")!
+        .getBoundingClientRect();
+      const done = Array.from(document.querySelectorAll("button"))
+        .find((button) => button.textContent?.trim() === "Done")!
+        .getBoundingClientRect();
+      return {
+        modalInside:
+          modal.left >= 0 &&
+          modal.top >= 0 &&
+          modal.right <= innerWidth &&
+          modal.bottom <= innerHeight,
+        surfaceUseful: surface.width > 300 && surface.height > 200,
+        actionsVisible:
+          cancel.top >= 0 &&
+          cancel.bottom <= innerHeight &&
+          done.top >= 0 &&
+          done.bottom <= innerHeight,
+        canScrollX: document.documentElement.scrollWidth > innerWidth,
+      };
+    });
+    expect(minimumFit).toEqual({
+      modalInside: true,
+      surfaceUseful: true,
+      actionsVisible: true,
+      canScrollX: false,
+    });
+    await page.screenshot({ path: screenshotPath("palang-crop-minimum.png") });
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await dialog.waitFor({ state: "detached" });
+    expect(
+      await backCrop.evaluate((element) => element === document.activeElement),
+    ).toBe(true);
+    const afterBackCancel = await page.evaluate(async () => {
+      const profile = (await window.palang.list()).profiles.find(
+        (item) => item.name === "Crop Interaction",
+      )!;
+      return {
+        frontImageId: profile.frontImageId,
+        backImageId: profile.backImageId,
+      };
+    });
+    expect(afterBackCancel).toEqual(after);
+
+    const backImageZoom = backEditor.getByRole("slider", {
+      name: "Back image zoom",
+    });
+    await backImageZoom.fill("1.25");
+    await backEditor
+      .getByRole("button", { name: "Back: Rotate image right 90°" })
+      .click();
+    await backCrop.click();
+    dialog = page.locator('[data-testid="image-crop-dialog"]');
+    await expect
+      .poll(() =>
+        dialog
+          .locator('[data-testid="crop-surface"]')
+          .getAttribute("data-ready"),
+      )
+      .toBe("true");
+    await dialog.getByRole("button", { name: "ID card" }).click();
+    await dialog.getByRole("button", { name: "Done" }).click();
+    await dialog.waitFor({ state: "detached", timeout: 10_000 });
+    expect(await backImageZoom.inputValue()).toBe("1");
+    const afterBackDone = await page.evaluate(async () => {
+      const profile = (await window.palang.list()).profiles.find(
+        (item) => item.name === "Crop Interaction",
+      )!;
+      return {
+        frontImageId: profile.frontImageId,
+        backImageId: profile.backImageId,
+      };
+    });
+    expect(afterBackDone.frontImageId).toBe(after.frontImageId);
+    expect(afterBackDone.backImageId).not.toBe(after.backImageId);
+
+    await page.getByRole("button", { name: /Back to profiles/ }).click();
+    await page.getByText("Crop Interaction", { exact: true }).click();
+    expect(await backImageZoom.inputValue()).toBe("1");
+    expect(
+      await page.evaluate(async () => {
+        const profile = (await window.palang.list()).profiles.find(
+          (item) => item.name === "Crop Interaction",
+        )!;
+        return {
+          imageScale: profile.backEditorState?.imageScale,
+          imageRotation: profile.backEditorState?.imageRotation,
+        };
+      }),
+    ).toEqual({ imageScale: 1, imageRotation: 0 });
   }, 60_000);
 });

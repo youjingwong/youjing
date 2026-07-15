@@ -36,8 +36,12 @@ const api = {
     ipcRenderer.invoke("profile:reorder", ids),
   importImage: (id: string, side: ImageSide) =>
     ipcRenderer.invoke("profile:import", id, side),
-  importImageBytes: (id: string, side: ImageSide, bytes: Uint8Array) =>
-    ipcRenderer.invoke("profile:importBytes", id, side, bytes),
+  importImageBytes: (
+    id: string,
+    side: ImageSide,
+    bytes: Uint8Array,
+    editorState?: ProfileEditorStateUpdate,
+  ) => ipcRenderer.invoke("profile:importBytes", id, side, bytes, editorState),
   pasteImage: (id: string, side: ImageSide) =>
     ipcRenderer.invoke("profile:pasteImage", id, side),
   removeBack: (id: string) => ipcRenderer.invoke("profile:removeBack", id),
