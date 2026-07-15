@@ -169,10 +169,13 @@ export const messages = {
     zoomOut: "Zoom image out",
     zoomIn: "Zoom image in",
     watermarkControl: "Watermark",
+    more: "More",
+    decreaseSize: "Decrease watermark size",
+    increaseSize: "Increase watermark size",
     moreWatermarkSettings: "More watermark settings",
     crossingLineControls: "Crossing line controls",
     watermarkGesturesHint:
-      "Select and drag the watermark. Pinch with two fingers to resize it. When the preview is focused, use the arrow keys to move the watermark; hold Shift for smaller steps.",
+      "Choose Watermark, then select and drag it. Pinch with two fingers to resize it. When the preview is focused, use the arrow keys to move the watermark; hold Shift for smaller steps.",
     resetWatermark: "Reset watermark",
     qualityWarning:
       "This image may be small or blurry. Check that all details remain readable before exporting.",
@@ -369,10 +372,13 @@ export const messages = {
     zoomOut: "Zum keluar imej",
     zoomIn: "Zum masuk imej",
     watermarkControl: "Tanda air",
+    more: "Lagi",
+    decreaseSize: "Kecilkan tanda air",
+    increaseSize: "Besarkan tanda air",
     moreWatermarkSettings: "Lagi tetapan tanda air",
     crossingLineControls: "Kawalan garisan silang",
     watermarkGesturesHint:
-      "Pilih dan seret tanda air. Cubit dengan dua jari untuk mengubah saiznya. Apabila pratonton difokuskan, gunakan kekunci anak panah untuk mengalih tanda air; tahan Shift untuk langkah yang lebih kecil.",
+      "Pilih Tanda air, kemudian pilih dan seret tanda air itu. Cubit dengan dua jari untuk mengubah saiznya. Apabila pratonton difokuskan, gunakan kekunci anak panah untuk mengalih tanda air; tahan Shift untuk langkah yang lebih kecil.",
     resetWatermark: "Tetapkan semula tanda air",
     qualityWarning:
       "Imej ini mungkin kecil atau kabur. Pastikan semua butiran boleh dibaca sebelum mengeksport.",

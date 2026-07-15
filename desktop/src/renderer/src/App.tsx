@@ -47,6 +47,7 @@ type Screen =
   | { kind: "settings" };
 
 type EditorSide = "front" | "back";
+type EditorToolMode = "image" | "watermark";
 
 export default function App() {
   const [vault, setVault] = useState<VaultData | null>(null);
@@ -525,6 +526,9 @@ function Editor({
   onError: (value: string) => void;
 }) {
   const [side, setSide] = useState<EditorSide>("front");
+  const [toolModes, setToolModes] = useState<
+    Record<EditorSide, EditorToolMode>
+  >({ front: "image", back: "image" });
   const [front, setFront] = useState<WatermarkSettings>(() => ({
     ...structuredClone(
       profile.frontEditorState?.watermark || vault.settings.defaultWatermark,
@@ -732,6 +736,7 @@ function Editor({
         await onProfileChange();
         setSelectedPresets((current) => ({ ...current, [target]: "" }));
         setSide(target);
+        setToolModes((current) => ({ ...current, [target]: "image" }));
       }
     } catch (cause) {
       onError(readError(cause));
@@ -744,12 +749,17 @@ function Editor({
       await onProfileChange();
       setSelectedPresets((current) => ({ ...current, [target]: "" }));
       setSide(target);
+      setToolModes((current) => ({ ...current, [target]: "image" }));
     } catch (cause) {
       onError(readError(cause));
     }
   }
   function activateSide(target: EditorSide) {
     setSide(target);
+  }
+  function activateTool(target: EditorSide, mode: EditorToolMode) {
+    setSide(target);
+    setToolModes((current) => ({ ...current, [target]: mode }));
   }
   async function removeBackImage() {
     if (!confirm(t("confirmRemoveBack"))) return;
@@ -886,7 +896,8 @@ function Editor({
               <strong>{t("addFrontTitle")}</strong>
               <p>{t("addFrontBody")}</p>
               <button className="primary" onClick={() => chooseImage("front")}>
-                ＋ {t("chooseFrontImage")}
+                <EditorIcon name="plus" />
+                {t("chooseFrontImage")}
               </button>
               <small>{t("dropHint")}</small>
             </div>
@@ -896,6 +907,7 @@ function Editor({
                 target="front"
                 label={t("front")}
                 active={side === "front"}
+                toolMode={toolModes.front}
                 exists={Boolean(profile.frontImageId)}
                 dataUrl={profile.frontDataUrl}
                 settings={front}
@@ -907,6 +919,7 @@ function Editor({
                 dragging={draggingFile === "front"}
                 t={t}
                 onActivate={() => activateSide("front")}
+                onToolMode={(mode) => activateTool("front", mode)}
                 onChoose={() => chooseImage("front")}
                 onPaste={() => void pasteImage("front")}
                 onDrop={(file) => void importFile("front", file)}
@@ -930,6 +943,7 @@ function Editor({
                 target="back"
                 label={t("backSide")}
                 active={side === "back"}
+                toolMode={toolModes.back}
                 exists={Boolean(profile.backImageId)}
                 dataUrl={profile.backDataUrl}
                 settings={back}
@@ -941,6 +955,7 @@ function Editor({
                 dragging={draggingFile === "back"}
                 t={t}
                 onActivate={() => activateSide("back")}
+                onToolMode={(mode) => activateTool("back", mode)}
                 onChoose={() => chooseImage("back")}
                 onPaste={() => void pasteImage("back")}
                 onDrop={(file) => void importFile("back", file)}
@@ -967,7 +982,10 @@ function Editor({
         </section>
         <aside className="controls-panel export-panel">
           <section className="export-section">
-            <h2>{t("export")}</h2>
+            <h2 className="export-heading">
+              <EditorIcon name="download" />
+              {t("export")}
+            </h2>
             <div className="segmented">
               <button
                 className={exportMode === "front" ? "active" : ""}
@@ -1038,6 +1056,7 @@ function Editor({
                 onClick={() => void doExport(true)}
                 disabled={busy || format === "pdf" || !profile.frontImageId}
               >
+                <EditorIcon name="copy" />
                 {t("copy")}
               </button>
               <button
@@ -1045,7 +1064,8 @@ function Editor({
                 onClick={() => void doExport()}
                 disabled={busy || !profile.frontImageId}
               >
-                {busy ? "…" : `↓ ${t("export")}`}
+                {!busy && <EditorIcon name="download" />}
+                {busy ? "…" : t("export")}
               </button>
             </div>
             {lastExport && (
@@ -1115,6 +1135,7 @@ function DocumentSideEditor({
   target,
   label,
   active,
+  toolMode,
   exists,
   dataUrl,
   settings,
@@ -1126,6 +1147,7 @@ function DocumentSideEditor({
   dragging,
   t,
   onActivate,
+  onToolMode,
   onChoose,
   onPaste,
   onDrop,
@@ -1145,6 +1167,7 @@ function DocumentSideEditor({
   target: EditorSide;
   label: string;
   active: boolean;
+  toolMode: EditorToolMode;
   exists: boolean;
   dataUrl?: string;
   settings: WatermarkSettings;
@@ -1156,6 +1179,7 @@ function DocumentSideEditor({
   dragging: boolean;
   t: T;
   onActivate: () => void;
+  onToolMode: (mode: EditorToolMode) => void;
   onChoose: () => void;
   onPaste: () => void;
   onDrop: (file: File) => void;
@@ -1183,6 +1207,7 @@ function DocumentSideEditor({
     <article
       className={`document-side ${active ? "active" : ""} ${dragging ? "file-dragging" : ""}`}
       data-side={target}
+      aria-label={label}
       onFocusCapture={onActivate}
       onDragOver={(event) => {
         event.preventDefault();
@@ -1216,9 +1241,13 @@ function DocumentSideEditor({
           <strong>{t("addBack")}</strong>
           <p>{t("addBackBody")}</p>
           <button className="primary" onClick={onChoose}>
-            ＋ {t("addBack")}
+            <EditorIcon name="plus" />
+            {t("addBack")}
           </button>
-          <button onClick={onPaste}>⌘ {t("paste")}</button>
+          <button onClick={onPaste}>
+            <EditorIcon name="paste" />
+            {t("paste")}
+          </button>
         </div>
       ) : (
         <>
@@ -1228,400 +1257,588 @@ function DocumentSideEditor({
             aria-label={`${label}: ${t("editorControls")}`}
           >
             <div
-              className="editor-tool-row"
+              className="editor-mode-tabs"
               role="group"
-              aria-label={`${label}: ${t("imageControls")}`}
+              aria-label={`${label}: ${t("editorControls")}`}
             >
-              <span className="editor-tool-label">
+              <button
+                id={`${target}-image-tab`}
+                type="button"
+                className={toolMode === "image" ? "active" : ""}
+                aria-label={`${label}: ${t("edit")} ${t("imageControls").toLowerCase()}`}
+                aria-pressed={toolMode === "image"}
+                onClick={() => onToolMode("image")}
+              >
                 <EditorIcon name="image" />
-                {t("imageControls")}
-              </span>
-              <button
-                className="tool-icon-button"
-                disabled={!dataUrl}
-                aria-label={`${label}: ${t("rotateImageLeft")}`}
-                onClick={() => onRotateImage(-90)}
-              >
-                <EditorIcon name="rotate-left" />
+                <span>{t("imageControls")}</span>
               </button>
               <button
-                className="tool-icon-button"
-                disabled={!dataUrl}
-                aria-label={`${label}: ${t("rotateImageRight")}`}
-                onClick={() => onRotateImage(90)}
-              >
-                <EditorIcon name="rotate-right" />
-              </button>
-              <div
-                className="zoom-control"
-                role="group"
-                aria-label={`${label} ${t("imageZoom").toLowerCase()}`}
-              >
-                <button
-                  className="tool-icon-button"
-                  disabled={imageScale <= 0.5}
-                  aria-label={`${label}: ${t("zoomOut")}`}
-                  onClick={() => onImageScale(imageScale - 0.05)}
-                >
-                  <EditorIcon name="zoom-out" />
-                </button>
-                <input
-                  className="image-zoom-slider"
-                  aria-label={`${label} ${t("imageZoom").toLowerCase()}`}
-                  type="range"
-                  min={0.5}
-                  max={3}
-                  step={0.05}
-                  value={imageScale}
-                  onChange={(event) => onImageScale(Number(event.target.value))}
-                />
-                <output>{Math.round(imageScale * 100)}%</output>
-                <button
-                  className="tool-icon-button"
-                  disabled={imageScale >= 3}
-                  aria-label={`${label}: ${t("zoomIn")}`}
-                  onClick={() => onImageScale(imageScale + 0.05)}
-                >
-                  <EditorIcon name="zoom-in" />
-                </button>
-              </div>
-            </div>
-            <div
-              className="editor-tool-row image-action-row"
-              role="group"
-              aria-label={`${label}: ${t("imageActions")}`}
-            >
-              <span className="editor-tool-label">
-                <EditorIcon name="crop" />
-                {t("imageActions")}
-              </span>
-              <button
-                aria-label={`${label}: ${t("prepareImage")}`}
-                disabled={!dataUrl}
-                onClick={onPrepare}
-              >
-                <EditorIcon name="crop" />
-                {t("prepareImage")}
-              </button>
-              <button
-                aria-label={`${label}: ${t("replace")}`}
-                onClick={onChoose}
-              >
-                ↻ {t("replace")}
-              </button>
-              <button aria-label={`${label}: ${t("paste")}`} onClick={onPaste}>
-                ⌘ {t("paste")}
-              </button>
-              {onRemove && (
-                <button
-                  className="danger-text"
-                  aria-label={`${label}: ${t("removeBack")}`}
-                  onClick={onRemove}
-                >
-                  {t("removeBack")}
-                </button>
-              )}
-            </div>
-            <div
-              className="editor-tool-row watermark-tool-row"
-              role="group"
-              aria-label={`${label}: ${t("watermarkControl")}`}
-            >
-              <span
-                className="watermark-tool-icon"
-                title={t("watermarkControl")}
+                id={`${target}-watermark-tab`}
+                type="button"
+                className={toolMode === "watermark" ? "active" : ""}
+                aria-label={`${label}: ${t("edit")} ${t("watermarkControl").toLowerCase()}`}
+                aria-pressed={toolMode === "watermark"}
+                onClick={() => onToolMode("watermark")}
               >
                 <EditorIcon name="type" />
-              </span>
-              <textarea
-                className="quick-watermark-input"
-                aria-label={`${t("edit")} ${label} ${t("watermarkControl").toLowerCase()}`}
-                rows={2}
-                maxLength={1000}
-                value={settings.text}
-                onChange={(event) => onSettings({ text: event.target.value })}
-              />
-              <label
-                className="tool-color-button"
-                title={`${t("color")}: ${settings.color.toUpperCase()}`}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{ backgroundColor: settings.color }}
-                />
-                <EditorIcon name="palette" />
-                <input
-                  aria-label={`${label} ${t("color").toLowerCase()}`}
-                  type="color"
-                  value={settings.color}
-                  onChange={(event) =>
-                    onSettings({ color: event.target.value })
-                  }
-                />
-              </label>
-              <label className="tool-slider" title={t("size")}>
-                <span aria-hidden="true">A</span>
-                <input
-                  aria-label={`${label} ${t("size").toLowerCase()}`}
-                  type="range"
-                  min={20}
-                  max={200}
-                  value={settings.fontSize}
-                  onChange={(event) =>
-                    onSettings({ fontSize: Number(event.target.value) })
-                  }
-                />
-                <output>{Math.round(settings.fontSize)}px</output>
-              </label>
-              <button
-                className="tool-icon-button"
-                aria-label={`${label}: ${t("rotateWatermarkLeft")}`}
-                onClick={() => onRotate(-5)}
-              >
-                <EditorIcon name="rotate-left" />
-              </button>
-              <label className="tool-slider" title={t("rotation")}>
-                <EditorIcon name="angle" />
-                <input
-                  aria-label={`${label} ${t("rotation").toLowerCase()}`}
-                  type="range"
-                  min={-180}
-                  max={180}
-                  value={settings.rotation}
-                  onChange={(event) =>
-                    onSettings({ rotation: Number(event.target.value) })
-                  }
-                />
-                <output>{Math.round(settings.rotation)}°</output>
-              </label>
-              <button
-                className="tool-icon-button"
-                aria-label={`${label}: ${t("rotateWatermarkRight")}`}
-                onClick={() => onRotate(5)}
-              >
-                <EditorIcon name="rotate-right" />
-              </button>
-              <button
-                className="tool-icon-button"
-                aria-label={`${label}: ${t("resetWatermark")}`}
-                onClick={onReset}
-              >
-                <EditorIcon name="reset" />
+                <span>{t("watermarkControl")}</span>
               </button>
             </div>
-          </div>
-          <details className="side-advanced-settings">
-            <summary aria-label={`${label}: ${t("moreWatermarkSettings")}`}>
-              <span>{t("moreWatermarkSettings")}</span>
-              <small>{t("sideSpecific")}</small>
-            </summary>
-            <div className="advanced-settings-body">
-              <div className="advanced-preset-row">
-                <label className="preset-select">
-                  {t("presets")}
-                  <select
-                    aria-label={`${label} ${t("presets").toLowerCase()}`}
-                    value={selectedPreset}
-                    onChange={(event) => onSelectPreset(event.target.value)}
-                  >
-                    <option value="">{t("presets")}…</option>
-                    {presets.map((preset) => (
-                      <option key={preset.id} value={preset.id}>
-                        {preset.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {otherSideExists && (
+            <div
+              id={`${target}-tool-panel`}
+              className={`contextual-toolbar ${toolMode}-toolbar`}
+              role="group"
+              aria-label={`${label}: ${
+                toolMode === "image"
+                  ? t("imageControls")
+                  : t("watermarkControl")
+              }`}
+            >
+              {toolMode === "image" ? (
+                <div
+                  className="contextual-control-row image-control-row"
+                  role="group"
+                  aria-label={`${label}: ${t("imageControls")}`}
+                >
                   <button
                     type="button"
-                    aria-label={`${label}: ${
-                      target === "front" ? t("copyToBack") : t("copyToFront")
-                    }`}
-                    onClick={onCopyToOther}
+                    className="toolbar-action crop-action"
+                    aria-label={`${label}: ${t("prepareImage")}`}
+                    title={t("prepareImage")}
+                    disabled={!dataUrl}
+                    onClick={onPrepare}
                   >
-                    {target === "front" ? t("copyToBack") : t("copyToFront")}
+                    <EditorIcon name="crop" />
+                    <span>{t("prepareImage")}</span>
                   </button>
-                )}
-              </div>
-              <div className="preset-actions">
-                <button
-                  aria-label={`${label}: ${t("savePreset")}`}
-                  onClick={() => onSavePreset("create")}
-                >
-                  ＋ {t("savePreset")}
-                </button>
-                {selectedPreset && (
-                  <>
-                    <button
-                      aria-label={`${label}: ${t("updatePreset")}`}
-                      onClick={() => onSavePreset("update")}
-                    >
-                      {t("updatePreset")}
-                    </button>
-                    <button
-                      className="danger-text"
-                      aria-label={`${label}: ${t("deletePreset")}`}
-                      onClick={onDeletePreset}
-                    >
-                      {t("deletePreset")}
-                    </button>
-                  </>
-                )}
-              </div>
-              <div className="side-control-grid">
-                <Range
-                  label={t("opacity")}
-                  ariaLabel={`${label} ${t("opacity").toLowerCase()}`}
-                  value={Math.round(settings.opacity * 100)}
-                  min={10}
-                  max={100}
-                  suffix="%"
-                  onChange={(opacity) => onSettings({ opacity: opacity / 100 })}
-                />
-                <label>
-                  {t("textAlign")}
-                  <select
-                    aria-label={`${label} ${t("textAlign").toLowerCase()}`}
-                    value={settings.align}
-                    onChange={(event) =>
-                      onSettings({
-                        align: event.target.value as WatermarkSettings["align"],
-                      })
-                    }
+                  <div
+                    className="compound-control rotation-control"
+                    role="group"
+                    aria-label={`${label}: ${t("imageControls")} ${t("rotation").toLowerCase()}`}
+                    data-control="image-rotation"
                   >
-                    <option value="left">{t("alignLeft")}</option>
-                    <option value="center">{t("alignCenter")}</option>
-                    <option value="right">{t("alignRight")}</option>
-                  </select>
-                </label>
-                <Range
-                  label={t("lineSpacing")}
-                  ariaLabel={`${label} ${t("lineSpacing").toLowerCase()}`}
-                  value={Math.round(settings.lineHeight * 100)}
-                  min={80}
-                  max={200}
-                  suffix="%"
-                  onChange={(lineHeight) =>
-                    onSettings({ lineHeight: lineHeight / 100 })
-                  }
-                />
-              </div>
-              <div className="check-row side-check-row">
-                <label className="check">
-                  <input
-                    aria-label={`${label} ${t("uppercase").toLowerCase()}`}
-                    type="checkbox"
-                    checked={settings.uppercase}
-                    onChange={(event) =>
-                      onSettings({ uppercase: event.target.checked })
-                    }
-                  />
-                  {t("uppercase")}
-                </label>
-                <label className="check">
-                  <input
-                    aria-label={`${label} ${t("date").toLowerCase()}`}
-                    type="checkbox"
-                    checked={settings.dateEnabled}
-                    onChange={(event) =>
-                      onSettings({ dateEnabled: event.target.checked })
-                    }
-                  />
-                  {t("date")}
-                </label>
-                <label className="check">
-                  <input
-                    aria-label={`${label} ${t("lines").toLowerCase()}`}
-                    type="checkbox"
-                    checked={settings.crossingLines.enabled}
-                    onChange={(event) =>
-                      onSettings({
-                        crossingLines: {
-                          ...settings.crossingLines,
-                          enabled: event.target.checked,
-                        },
-                      })
-                    }
-                  />
-                  {t("lines")}
-                </label>
-              </div>
-              {settings.crossingLines.enabled && (
-                <div
-                  className="side-control-grid crossing-controls"
-                  role="group"
-                  aria-label={`${label}: ${t("crossingLineControls")}`}
-                >
-                  <Range
-                    label={t("lineThickness")}
-                    ariaLabel={`${label} ${t("lineThickness").toLowerCase()}`}
-                    value={settings.crossingLines.thickness}
-                    min={1}
-                    max={20}
-                    onChange={(thickness) =>
-                      onSettings({
-                        crossingLines: {
-                          ...settings.crossingLines,
-                          thickness,
-                        },
-                      })
-                    }
-                  />
-                  <Range
-                    label={t("lineOpacity")}
-                    ariaLabel={`${label} ${t("lineOpacity").toLowerCase()}`}
-                    value={Math.round(settings.crossingLines.opacity * 100)}
-                    min={10}
-                    max={100}
-                    suffix="%"
-                    onChange={(opacity) =>
-                      onSettings({
-                        crossingLines: {
-                          ...settings.crossingLines,
-                          opacity: opacity / 100,
-                        },
-                      })
-                    }
-                  />
-                  <Range
-                    label={t("lineWidth")}
-                    ariaLabel={`${label} ${t("lineWidth").toLowerCase()}`}
-                    value={Math.round(settings.crossingLines.scale * 100)}
-                    min={20}
-                    max={100}
-                    suffix="%"
-                    onChange={(scale) =>
-                      onSettings({
-                        crossingLines: {
-                          ...settings.crossingLines,
-                          scale: scale / 100,
-                        },
-                      })
-                    }
-                  />
-                  <label>
-                    {t("color")}
+                    <button
+                      type="button"
+                      className="toolbar-icon-button"
+                      disabled={!dataUrl}
+                      aria-label={`${label}: ${t("rotateImageLeft")}`}
+                      title={t("rotateImageLeft")}
+                      onClick={() => onRotateImage(-90)}
+                    >
+                      <EditorIcon name="rotate-left" />
+                    </button>
+                    <output aria-live="polite">{imageRotation}°</output>
+                    <button
+                      type="button"
+                      className="toolbar-icon-button"
+                      disabled={!dataUrl}
+                      aria-label={`${label}: ${t("rotateImageRight")}`}
+                      title={t("rotateImageRight")}
+                      onClick={() => onRotateImage(90)}
+                    >
+                      <EditorIcon name="rotate-right" />
+                    </button>
+                  </div>
+                  <div
+                    className="compound-control zoom-control"
+                    role="group"
+                    aria-label={`${label} ${t("imageZoom").toLowerCase()}`}
+                    data-control="image-zoom"
+                  >
+                    <button
+                      type="button"
+                      className="toolbar-icon-button"
+                      disabled={imageScale <= 0.5}
+                      aria-label={`${label}: ${t("zoomOut")}`}
+                      title={t("zoomOut")}
+                      onClick={() => onImageScale(imageScale - 0.05)}
+                    >
+                      <EditorIcon name="zoom-out" />
+                    </button>
                     <input
-                      className="color"
-                      aria-label={`${label} ${t("lines").toLowerCase()} ${t("color").toLowerCase()}`}
-                      type="color"
-                      value={settings.crossingLines.color}
+                      className="image-zoom-slider"
+                      aria-label={`${label} ${t("imageZoom").toLowerCase()}`}
+                      type="range"
+                      min={0.5}
+                      max={3}
+                      step={0.05}
+                      value={imageScale}
+                      aria-valuetext={`${Math.round(imageScale * 100)}%`}
                       onChange={(event) =>
-                        onSettings({
-                          crossingLines: {
-                            ...settings.crossingLines,
-                            color: event.target.value,
-                          },
-                        })
+                        onImageScale(Number(event.target.value))
+                      }
+                    />
+                    <output aria-live="polite">
+                      {Math.round(imageScale * 100)}%
+                    </output>
+                    <button
+                      type="button"
+                      className="toolbar-icon-button"
+                      disabled={imageScale >= 3}
+                      aria-label={`${label}: ${t("zoomIn")}`}
+                      title={t("zoomIn")}
+                      onClick={() => onImageScale(imageScale + 0.05)}
+                    >
+                      <EditorIcon name="zoom-in" />
+                    </button>
+                  </div>
+                  <details
+                    className="toolbar-menu image-file-menu"
+                    onKeyDown={(event) => {
+                      if (event.key !== "Escape") return;
+                      event.currentTarget.removeAttribute("open");
+                      event.currentTarget.querySelector("summary")?.focus();
+                    }}
+                  >
+                    <summary
+                      className="toolbar-icon-button"
+                      aria-label={`${label}: ${t("imageActions")}`}
+                      title={t("imageActions")}
+                    >
+                      <EditorIcon name="more" />
+                    </summary>
+                    <div className="toolbar-popover image-menu-popover">
+                      <button
+                        type="button"
+                        aria-label={`${label}: ${t("replace")}`}
+                        onClick={(event) => {
+                          event.currentTarget
+                            .closest("details")
+                            ?.removeAttribute("open");
+                          onChoose();
+                        }}
+                      >
+                        <EditorIcon name="replace" />
+                        {t("replace")}
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`${label}: ${t("paste")}`}
+                        onClick={(event) => {
+                          event.currentTarget
+                            .closest("details")
+                            ?.removeAttribute("open");
+                          onPaste();
+                        }}
+                      >
+                        <EditorIcon name="paste" />
+                        {t("paste")}
+                      </button>
+                      {onRemove && (
+                        <button
+                          type="button"
+                          className="danger-text"
+                          aria-label={`${label}: ${t("removeBack")}`}
+                          onClick={(event) => {
+                            event.currentTarget
+                              .closest("details")
+                              ?.removeAttribute("open");
+                            onRemove();
+                          }}
+                        >
+                          <EditorIcon name="trash" />
+                          {t("removeBack")}
+                        </button>
+                      )}
+                    </div>
+                  </details>
+                </div>
+              ) : (
+                <div className="watermark-context">
+                  <label className="watermark-text-control">
+                    <span className="sr-only">{t("watermark")}</span>
+                    <EditorIcon name="type" />
+                    <textarea
+                      className="quick-watermark-input"
+                      aria-label={`${t("edit")} ${label} ${t("watermarkControl").toLowerCase()}`}
+                      rows={2}
+                      maxLength={1000}
+                      value={settings.text}
+                      onChange={(event) =>
+                        onSettings({ text: event.target.value })
                       }
                     />
                   </label>
+                  <div
+                    className="contextual-control-row watermark-control-row"
+                    role="group"
+                    aria-label={`${label}: ${t("watermarkControl")}`}
+                  >
+                    <div
+                      className="compound-control watermark-size-control"
+                      role="group"
+                      aria-label={`${label}: ${t("size")}`}
+                      data-control="watermark-size"
+                    >
+                      <button
+                        type="button"
+                        className="toolbar-icon-button text-stepper"
+                        aria-label={`${label}: ${t("decreaseSize")}`}
+                        title={t("decreaseSize")}
+                        disabled={settings.fontSize <= 20}
+                        onClick={() =>
+                          onSettings({
+                            fontSize: Math.max(20, settings.fontSize - 5),
+                          })
+                        }
+                      >
+                        A−
+                      </button>
+                      <input
+                        aria-label={`${label} ${t("size").toLowerCase()}`}
+                        type="range"
+                        min={20}
+                        max={200}
+                        value={settings.fontSize}
+                        aria-valuetext={`${Math.round(settings.fontSize)}px`}
+                        onChange={(event) =>
+                          onSettings({ fontSize: Number(event.target.value) })
+                        }
+                      />
+                      <output aria-live="polite">
+                        {Math.round(settings.fontSize)}px
+                      </output>
+                      <button
+                        type="button"
+                        className="toolbar-icon-button text-stepper"
+                        aria-label={`${label}: ${t("increaseSize")}`}
+                        title={t("increaseSize")}
+                        disabled={settings.fontSize >= 200}
+                        onClick={() =>
+                          onSettings({
+                            fontSize: Math.min(200, settings.fontSize + 5),
+                          })
+                        }
+                      >
+                        A+
+                      </button>
+                    </div>
+                    <div
+                      className="compound-control watermark-rotation-control"
+                      role="group"
+                      aria-label={`${label}: ${t("watermarkControl")} ${t("rotation").toLowerCase()}`}
+                      data-control="watermark-rotation"
+                    >
+                      <button
+                        type="button"
+                        className="toolbar-icon-button"
+                        aria-label={`${label}: ${t("rotateWatermarkLeft")}`}
+                        title={t("rotateWatermarkLeft")}
+                        onClick={() => onRotate(-5)}
+                      >
+                        <EditorIcon name="rotate-left" />
+                      </button>
+                      <input
+                        aria-label={`${label} ${t("rotation").toLowerCase()}`}
+                        type="range"
+                        min={-180}
+                        max={180}
+                        value={settings.rotation}
+                        aria-valuetext={`${Math.round(settings.rotation)}°`}
+                        onChange={(event) =>
+                          onSettings({ rotation: Number(event.target.value) })
+                        }
+                      />
+                      <output aria-live="polite">
+                        {Math.round(settings.rotation)}°
+                      </output>
+                      <button
+                        type="button"
+                        className="toolbar-icon-button"
+                        aria-label={`${label}: ${t("rotateWatermarkRight")}`}
+                        title={t("rotateWatermarkRight")}
+                        onClick={() => onRotate(5)}
+                      >
+                        <EditorIcon name="rotate-right" />
+                      </button>
+                    </div>
+                    <label
+                      className="tool-color-button"
+                      title={`${t("color")}: ${settings.color.toUpperCase()}`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        style={{ backgroundColor: settings.color }}
+                      />
+                      <EditorIcon name="palette" />
+                      <input
+                        aria-label={`${label} ${t("color").toLowerCase()}`}
+                        type="color"
+                        value={settings.color}
+                        onChange={(event) =>
+                          onSettings({ color: event.target.value })
+                        }
+                      />
+                    </label>
+                    <details
+                      className="toolbar-menu watermark-more side-advanced-settings"
+                      onKeyDown={(event) => {
+                        if (event.key !== "Escape") return;
+                        event.currentTarget.removeAttribute("open");
+                        event.currentTarget.querySelector("summary")?.focus();
+                      }}
+                    >
+                      <summary
+                        className="toolbar-action more-action"
+                        aria-label={`${label}: ${t("moreWatermarkSettings")}`}
+                        title={t("moreWatermarkSettings")}
+                      >
+                        <EditorIcon name="more" />
+                        <span>{t("more")}</span>
+                      </summary>
+                      <div className="toolbar-popover advanced-settings-popover">
+                        <header className="advanced-settings-header">
+                          <div>
+                            <strong>{t("moreWatermarkSettings")}</strong>
+                            <small>{t("sideSpecific")}</small>
+                          </div>
+                          <button
+                            type="button"
+                            className="reset-watermark-action"
+                            aria-label={`${label}: ${t("resetWatermark")}`}
+                            onClick={onReset}
+                          >
+                            <EditorIcon name="restore" />
+                            {t("resetWatermark")}
+                          </button>
+                        </header>
+                        <div className="advanced-settings-body">
+                          <div className="advanced-preset-row">
+                            <label className="preset-select">
+                              {t("presets")}
+                              <select
+                                aria-label={`${label} ${t("presets").toLowerCase()}`}
+                                value={selectedPreset}
+                                onChange={(event) =>
+                                  onSelectPreset(event.target.value)
+                                }
+                              >
+                                <option value="">{t("presets")}…</option>
+                                {presets.map((preset) => (
+                                  <option key={preset.id} value={preset.id}>
+                                    {preset.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            {otherSideExists && (
+                              <button
+                                type="button"
+                                aria-label={`${label}: ${
+                                  target === "front"
+                                    ? t("copyToBack")
+                                    : t("copyToFront")
+                                }`}
+                                onClick={onCopyToOther}
+                              >
+                                <EditorIcon name="copy" />
+                                {target === "front"
+                                  ? t("copyToBack")
+                                  : t("copyToFront")}
+                              </button>
+                            )}
+                          </div>
+                          <div className="preset-actions">
+                            <button
+                              type="button"
+                              aria-label={`${label}: ${t("savePreset")}`}
+                              onClick={() => onSavePreset("create")}
+                            >
+                              <EditorIcon name="plus" />
+                              {t("savePreset")}
+                            </button>
+                            {selectedPreset && (
+                              <>
+                                <button
+                                  type="button"
+                                  aria-label={`${label}: ${t("updatePreset")}`}
+                                  onClick={() => onSavePreset("update")}
+                                >
+                                  {t("updatePreset")}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="danger-text"
+                                  aria-label={`${label}: ${t("deletePreset")}`}
+                                  onClick={onDeletePreset}
+                                >
+                                  <EditorIcon name="trash" />
+                                  {t("deletePreset")}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                          <div className="side-control-grid">
+                            <Range
+                              label={t("opacity")}
+                              ariaLabel={`${label} ${t("opacity").toLowerCase()}`}
+                              value={Math.round(settings.opacity * 100)}
+                              min={10}
+                              max={100}
+                              suffix="%"
+                              onChange={(opacity) =>
+                                onSettings({ opacity: opacity / 100 })
+                              }
+                            />
+                            <label>
+                              {t("textAlign")}
+                              <select
+                                aria-label={`${label} ${t("textAlign").toLowerCase()}`}
+                                value={settings.align}
+                                onChange={(event) =>
+                                  onSettings({
+                                    align: event.target
+                                      .value as WatermarkSettings["align"],
+                                  })
+                                }
+                              >
+                                <option value="left">{t("alignLeft")}</option>
+                                <option value="center">
+                                  {t("alignCenter")}
+                                </option>
+                                <option value="right">{t("alignRight")}</option>
+                              </select>
+                            </label>
+                            <Range
+                              label={t("lineSpacing")}
+                              ariaLabel={`${label} ${t("lineSpacing").toLowerCase()}`}
+                              value={Math.round(settings.lineHeight * 100)}
+                              min={80}
+                              max={200}
+                              suffix="%"
+                              onChange={(lineHeight) =>
+                                onSettings({ lineHeight: lineHeight / 100 })
+                              }
+                            />
+                          </div>
+                          <div className="check-row side-check-row">
+                            <label className="check">
+                              <input
+                                aria-label={`${label} ${t("uppercase").toLowerCase()}`}
+                                type="checkbox"
+                                checked={settings.uppercase}
+                                onChange={(event) =>
+                                  onSettings({
+                                    uppercase: event.target.checked,
+                                  })
+                                }
+                              />
+                              {t("uppercase")}
+                            </label>
+                            <label className="check">
+                              <input
+                                aria-label={`${label} ${t("date").toLowerCase()}`}
+                                type="checkbox"
+                                checked={settings.dateEnabled}
+                                onChange={(event) =>
+                                  onSettings({
+                                    dateEnabled: event.target.checked,
+                                  })
+                                }
+                              />
+                              {t("date")}
+                            </label>
+                            <label className="check">
+                              <input
+                                aria-label={`${label} ${t("lines").toLowerCase()}`}
+                                type="checkbox"
+                                checked={settings.crossingLines.enabled}
+                                onChange={(event) =>
+                                  onSettings({
+                                    crossingLines: {
+                                      ...settings.crossingLines,
+                                      enabled: event.target.checked,
+                                    },
+                                  })
+                                }
+                              />
+                              {t("lines")}
+                            </label>
+                          </div>
+                          {settings.crossingLines.enabled && (
+                            <div
+                              className="side-control-grid crossing-controls"
+                              role="group"
+                              aria-label={`${label}: ${t("crossingLineControls")}`}
+                            >
+                              <Range
+                                label={t("lineThickness")}
+                                ariaLabel={`${label} ${t("lineThickness").toLowerCase()}`}
+                                value={settings.crossingLines.thickness}
+                                min={1}
+                                max={20}
+                                onChange={(thickness) =>
+                                  onSettings({
+                                    crossingLines: {
+                                      ...settings.crossingLines,
+                                      thickness,
+                                    },
+                                  })
+                                }
+                              />
+                              <Range
+                                label={t("lineOpacity")}
+                                ariaLabel={`${label} ${t("lineOpacity").toLowerCase()}`}
+                                value={Math.round(
+                                  settings.crossingLines.opacity * 100,
+                                )}
+                                min={10}
+                                max={100}
+                                suffix="%"
+                                onChange={(opacity) =>
+                                  onSettings({
+                                    crossingLines: {
+                                      ...settings.crossingLines,
+                                      opacity: opacity / 100,
+                                    },
+                                  })
+                                }
+                              />
+                              <Range
+                                label={t("lineWidth")}
+                                ariaLabel={`${label} ${t("lineWidth").toLowerCase()}`}
+                                value={Math.round(
+                                  settings.crossingLines.scale * 100,
+                                )}
+                                min={20}
+                                max={100}
+                                suffix="%"
+                                onChange={(scale) =>
+                                  onSettings({
+                                    crossingLines: {
+                                      ...settings.crossingLines,
+                                      scale: scale / 100,
+                                    },
+                                  })
+                                }
+                              />
+                              <label>
+                                {t("color")}
+                                <input
+                                  className="color"
+                                  aria-label={`${label} ${t("lines").toLowerCase()} ${t("color").toLowerCase()}`}
+                                  type="color"
+                                  value={settings.crossingLines.color}
+                                  onChange={(event) =>
+                                    onSettings({
+                                      crossingLines: {
+                                        ...settings.crossingLines,
+                                        color: event.target.value,
+                                      },
+                                    })
+                                  }
+                                />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </details>
+                  </div>
                 </div>
               )}
             </div>
-          </details>
-          <p className="drop-hint above-image-hint">{t("dropHint")}</p>
+          </div>
           <p id={`${target}-watermark-gestures`} className="sr-only">
             {t("watermarkGesturesHint")}
           </p>
@@ -1631,6 +1848,7 @@ function DocumentSideEditor({
               settings={settings}
               imageScale={imageScale}
               imageRotation={imageRotation}
+              selectedTarget={toolMode}
               ariaLabel={`${label} ${t("documentPreview").toLowerCase()}`}
               ariaDescribedBy={`${target}-watermark-gestures`}
               onPosition={(x, y) => onSettings({ x, y })}
@@ -1638,6 +1856,7 @@ function DocumentSideEditor({
                 onSettings({ fontSize, rotation })
               }
               onImageScale={onImageScale}
+              onSelectTarget={onToolMode}
             />
           ) : (
             <div className="corrupt-image">
@@ -1661,15 +1880,22 @@ type EditorIconName =
   | "zoom-out"
   | "type"
   | "palette"
-  | "angle"
   | "rotate-left"
   | "rotate-right"
-  | "reset";
+  | "replace"
+  | "paste"
+  | "trash"
+  | "more"
+  | "copy"
+  | "download"
+  | "restore"
+  | "plus";
 
 function EditorIcon({ name }: { name: EditorIconName }) {
   return (
     <svg
       aria-hidden="true"
+      data-icon={name}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -1711,11 +1937,6 @@ function EditorIcon({ name }: { name: EditorIconName }) {
           <circle cx="16.5" cy="11.5" r=".5" fill="currentColor" />
         </>
       )}
-      {name === "angle" && (
-        <>
-          <path d="M4 18h16M6 18a6 6 0 0 1 12 0M12 12v6" />
-        </>
-      )}
       {name === "rotate-left" && (
         <>
           <path d="M3 12a9 9 0 1 0 2.64-6.36L3 8" />
@@ -1728,12 +1949,51 @@ function EditorIcon({ name }: { name: EditorIconName }) {
           <path d="M21 3v5h-5" />
         </>
       )}
-      {name === "reset" && (
+      {name === "replace" && (
         <>
-          <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-          <path d="M3 3v5h5" />
+          <rect x="3" y="4" width="14" height="12" rx="2" />
+          <path d="m17 9 4 4-4 4M21 13h-8" />
+          <path d="m6 13 3-3 3 3" />
         </>
       )}
+      {name === "paste" && (
+        <>
+          <path d="M9 5h6M9 3h6a1 1 0 0 1 1 1v3H8V4a1 1 0 0 1 1-1Z" />
+          <path d="M7 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9" />
+          <path d="M17 12v8M13 16h8" />
+        </>
+      )}
+      {name === "trash" && (
+        <>
+          <path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15M10 10v7M14 10v7" />
+        </>
+      )}
+      {name === "more" && (
+        <>
+          <circle cx="5" cy="12" r="1" fill="currentColor" />
+          <circle cx="12" cy="12" r="1" fill="currentColor" />
+          <circle cx="19" cy="12" r="1" fill="currentColor" />
+        </>
+      )}
+      {name === "copy" && (
+        <>
+          <rect x="8" y="8" width="12" height="12" rx="2" />
+          <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+        </>
+      )}
+      {name === "download" && (
+        <>
+          <path d="M12 3v12M7 10l5 5 5-5M4 21h16" />
+        </>
+      )}
+      {name === "restore" && (
+        <>
+          <path d="M4 7h10M4 17h16M14 4v6M9 14v6" />
+          <circle cx="14" cy="7" r="2" />
+          <circle cx="9" cy="17" r="2" />
+        </>
+      )}
+      {name === "plus" && <path d="M12 5v14M5 12h14" />}
     </svg>
   );
 }
@@ -1743,24 +2003,28 @@ function WatermarkCanvas({
   settings,
   imageScale,
   imageRotation,
+  selectedTarget,
   ariaLabel,
   ariaDescribedBy,
   onPosition,
   onTransform,
   onImageScale,
+  onSelectTarget,
 }: {
   dataUrl: string;
   settings: WatermarkSettings;
   imageScale: number;
   imageRotation: ImageRotation;
+  selectedTarget: EditorToolMode;
   ariaLabel: string;
   ariaDescribedBy: string;
   onPosition: (x: number, y: number) => void;
   onTransform: (fontSize: number, rotation: number) => void;
   onImageScale: (scale: number) => void;
+  onSelectTarget: (target: EditorToolMode) => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [selected, setSelected] = useState(false);
+  const selected = selectedTarget === "watermark";
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const drag = useRef<{
     pointerId: number;
@@ -1884,12 +2148,13 @@ function WatermarkCanvas({
     event.preventDefault();
     const factor = Math.exp(-event.deltaY * 0.012);
     if (selected || isPointInWatermark(ctx, canvas, settings, point)) {
-      setSelected(true);
+      onSelectTarget("watermark");
       onTransform(
         Math.min(200, Math.max(20, settings.fontSize * factor)),
         settings.rotation,
       );
     } else {
+      onSelectTarget("image");
       onImageScale(Math.min(3, Math.max(0.5, imageScale * factor)));
     }
   }
@@ -1909,13 +2174,13 @@ function WatermarkCanvas({
             ctx && isPointInWatermark(ctx, e.currentTarget, settings, point),
           );
           if (pointers.current.size >= 2 && (selected || drag.current)) {
-            setSelected(true);
+            onSelectTarget("watermark");
             startTransform();
           } else if (hit) {
-            setSelected(true);
+            onSelectTarget("watermark");
             drag.current = { pointerId: e.pointerId, point };
           } else {
-            setSelected(false);
+            onSelectTarget("image");
             drag.current = null;
           }
         }}
@@ -1924,6 +2189,7 @@ function WatermarkCanvas({
         onPointerCancel={endPointer}
         onWheel={pinchWatermark}
         onKeyDown={(e) => {
+          if (!selected) return;
           if (
             !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)
           )
