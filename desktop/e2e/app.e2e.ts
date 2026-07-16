@@ -77,6 +77,92 @@ async function readCompoundControlLayout(page: Page, selectors: string[]) {
   }, selectors);
 }
 
+async function readFrontWatermarkToolbarBounds(page: Page) {
+  return page.evaluate(() => {
+    const card = document.querySelector<HTMLElement>(
+      'article.document-side[data-side="front"]',
+    )!;
+    const toolbar = card.querySelector<HTMLElement>(
+      ".contextual-toolbar.watermark-toolbar",
+    )!;
+    const context = toolbar.querySelector<HTMLElement>(".watermark-context")!;
+    const text = toolbar.querySelector<HTMLElement>(".quick-watermark-input")!;
+    const row = toolbar.querySelector<HTMLElement>(".watermark-control-row")!;
+    const rect = (element: Element) => element.getBoundingClientRect();
+    const contains = (outer: DOMRect, inner: DOMRect) =>
+      inner.left >= outer.left - 1 &&
+      inner.top >= outer.top - 1 &&
+      inner.right <= outer.right + 1 &&
+      inner.bottom <= outer.bottom + 1;
+    const cardRect = rect(card);
+    const toolbarRect = rect(toolbar);
+    const controls = [
+      [
+        "size",
+        row.querySelector<HTMLElement>('[data-control="watermark-size"]')!,
+      ],
+      [
+        "rotation",
+        row.querySelector<HTMLElement>('[data-control="watermark-rotation"]')!,
+      ],
+      ["colour", row.querySelector<HTMLElement>(".tool-color-button")!],
+      [
+        "more",
+        row.querySelector<HTMLElement>(
+          "details.side-advanced-settings > summary",
+        )!,
+      ],
+    ] as const;
+    const popover = toolbar.querySelector<HTMLElement>(
+      ".advanced-settings-popover",
+    );
+    const popoverRect = popover ? rect(popover) : null;
+    const sizeRange = row.querySelector<HTMLInputElement>(
+      '[data-control="watermark-size"] input[type="range"]',
+    )!;
+    const rotationRange = row.querySelector<HTMLInputElement>(
+      '[data-control="watermark-rotation"] input[type="range"]',
+    )!;
+    return {
+      contextInsideToolbar: contains(toolbarRect, rect(context)),
+      textInsideToolbar: contains(toolbarRect, rect(text)),
+      textInsideCard: contains(cardRect, rect(text)),
+      rowInsideToolbar: contains(toolbarRect, rect(row)),
+      rowNoOverflow: row.scrollWidth <= row.clientWidth + 1,
+      toolbarNoOverflow: toolbar.scrollWidth <= toolbar.clientWidth + 1,
+      rangesVisible: {
+        size: getComputedStyle(sizeRange).display !== "none",
+        rotation: getComputedStyle(rotationRange).display !== "none",
+      },
+      controls: controls.map(([name, element]) => {
+        const controlRect = rect(element);
+        return {
+          name,
+          insideToolbar: contains(toolbarRect, controlRect),
+          insideCard: contains(cardRect, controlRect),
+        };
+      }),
+      canScrollX:
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+      popover:
+        popover && popoverRect
+          ? {
+              position: getComputedStyle(popover).position,
+              insideViewport:
+                popoverRect.left >= -1 &&
+                popoverRect.top >= -1 &&
+                popoverRect.right <= innerWidth + 1 &&
+                popoverRect.bottom <= innerHeight + 1,
+              insideCardHorizontally:
+                popoverRect.left >= cardRect.left - 1 &&
+                popoverRect.right <= cardRect.right + 1,
+            }
+          : null,
+    };
+  });
+}
+
 afterEach(async () => {
   await running?.close();
   running = undefined;
@@ -327,6 +413,103 @@ describe("Palang IC desktop shell", () => {
     await page
       .locator('article.document-side[data-side="front"] .side-editor-tools')
       .waitFor();
+    const frontOnlyEditor = page.locator(
+      'article.document-side[data-side="front"]',
+    );
+    const frontOnlyWatermark = frontOnlyEditor.getByRole("button", {
+      name: "Front: Edit watermark",
+    });
+    const frontOnlyImage = frontOnlyEditor.getByRole("button", {
+      name: "Front: Edit image",
+    });
+    const frontOnlyMore = frontOnlyEditor.locator(
+      'summary[aria-label="Front: More watermark settings"]',
+    );
+    expect(
+      await page
+        .locator('article.document-side[data-side="back"] .empty-side-upload')
+        .isVisible(),
+    ).toBe(true);
+    const launchedSize = await page.evaluate(() => ({
+      width: innerWidth,
+      height: innerHeight,
+    }));
+    const originalTheme = await page.locator("html").getAttribute("data-theme");
+    await frontOnlyWatermark.click();
+    await frontOnlyEditor
+      .getByLabel("Edit Front watermark")
+      .fill(
+        "A VERY LONG PRIVATE WATERMARK LABEL\nSECOND PRIVATE WATERMARK LINE",
+      );
+    const assertFrontOnlyWatermarkFit = async (rangesVisible: boolean) => {
+      const closed = await readFrontWatermarkToolbarBounds(page);
+      expect(closed.contextInsideToolbar).toBe(true);
+      expect(closed.textInsideToolbar).toBe(true);
+      expect(closed.textInsideCard).toBe(true);
+      expect(closed.rowInsideToolbar).toBe(true);
+      expect(closed.rowNoOverflow).toBe(true);
+      expect(closed.toolbarNoOverflow).toBe(true);
+      expect(closed.rangesVisible).toEqual({
+        size: rangesVisible,
+        rotation: rangesVisible,
+      });
+      expect(closed.controls.map(({ name }) => name)).toEqual([
+        "size",
+        "rotation",
+        "colour",
+        "more",
+      ]);
+      expect(
+        closed.controls.every(
+          ({ insideToolbar, insideCard }) => insideToolbar && insideCard,
+        ),
+      ).toBe(true);
+      expect(closed.canScrollX).toBe(false);
+      await frontOnlyMore.click();
+      const opened = await readFrontWatermarkToolbarBounds(page);
+      expect(opened.popover).not.toBeNull();
+      expect(opened.popover!.position).toBe("absolute");
+      expect(opened.popover!.insideViewport).toBe(true);
+      expect(opened.popover!.insideCardHorizontally).toBe(true);
+      await frontOnlyMore.click();
+    };
+    for (const theme of ["light", "dark"] as const) {
+      await page.locator("html").evaluate((element, value) => {
+        element.dataset.theme = value;
+      }, theme);
+      await assertFrontOnlyWatermarkFit(true);
+    }
+    for (const size of [
+      { width: 1100, height: 760 },
+      { width: 960, height: 680 },
+    ]) {
+      await running.evaluate(({ BrowserWindow }, nextSize) => {
+        BrowserWindow.getAllWindows()[0]?.setContentSize(
+          nextSize.width,
+          nextSize.height,
+        );
+      }, size);
+      await expect
+        .poll(() => page.evaluate(() => [innerWidth, innerHeight]))
+        .toEqual([size.width, size.height]);
+      for (const theme of ["light", "dark"] as const) {
+        await page.locator("html").evaluate((element, value) => {
+          element.dataset.theme = value;
+        }, theme);
+        await assertFrontOnlyWatermarkFit(false);
+      }
+    }
+    await running.evaluate(({ BrowserWindow }, size) => {
+      BrowserWindow.getAllWindows()[0]?.setContentSize(size.width, size.height);
+    }, launchedSize);
+    await expect
+      .poll(() => page.evaluate(() => [innerWidth, innerHeight]))
+      .toEqual([launchedSize.width, launchedSize.height]);
+    await page.locator("html").evaluate((element, value) => {
+      if (value === null) delete element.dataset.theme;
+      else element.dataset.theme = value;
+    }, originalTheme);
+    await frontOnlyImage.click();
     const backChooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "Add back image" }).click();
     await (

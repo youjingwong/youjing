@@ -667,6 +667,8 @@ label {
 }
 .side-editor-tools {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   position: relative;
   z-index: 2;
 }
@@ -709,6 +711,8 @@ label {
 }
 .contextual-toolbar {
   min-height: 118px;
+  min-width: 0;
+  max-width: 100%;
   position: relative;
   padding: 10px;
   display: flex;
@@ -718,6 +722,8 @@ label {
 }
 .contextual-control-row {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -808,12 +814,16 @@ label {
 }
 .watermark-context {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   display: grid;
   grid-template-rows: 48px 36px;
   gap: 8px;
 }
 .watermark-text-control {
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -824,7 +834,9 @@ label {
 }
 .quick-watermark-input {
   min-width: 0;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
+  flex: 1 1 0;
   height: 48px;
   min-height: 48px;
   margin: 0;
@@ -1026,8 +1038,13 @@ label {
 .side-advanced-settings {
   flex: none;
 }
+.watermark-more {
+  position: static;
+}
 .advanced-settings-popover {
-  width: min(390px, calc((100vw - 236px) / 2 - 30px));
+  width: min(390px, calc(100cqi - 20px));
+  max-width: calc(100cqi - 20px);
+  right: 10px;
   max-height: calc(100vh - 310px);
   padding: 0;
   overflow-y: auto;
@@ -1631,22 +1648,21 @@ label {
     justify-content: center;
   }
 }
-@media (max-width: 1050px) {
-  .preview-panel {
-    padding: 14px 12px;
+@container (max-width: 530px) {
+  .watermark-control-row {
+    gap: 4px;
   }
-  .document-pair {
-    gap: 8px;
+  .watermark-control-row .compound-control .toolbar-icon-button {
+    width: 30px;
   }
-  .document-side {
-    padding: 6px;
+  .watermark-control-row .rotation-control output {
+    min-width: 34px;
   }
-  .document-side-heading small {
-    display: none;
+  .watermark-control-row .watermark-size-control output {
+    min-width: 36px;
   }
-  .controls-panel section {
-    padding: 18px 15px;
-  }
+}
+@container (max-width: 430px) {
   .contextual-control-row {
     gap: 4px;
   }
@@ -1676,9 +1692,6 @@ label {
   .image-file-menu > summary {
     width: 32px;
   }
-  .advanced-settings-popover {
-    width: min(390px, calc((100vw - 236px) / 2 - 42px));
-  }
   .crop-action span,
   .more-action span {
     position: absolute;
@@ -1687,6 +1700,23 @@ label {
     overflow: hidden;
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
+  }
+}
+@media (max-width: 1050px) {
+  .preview-panel {
+    padding: 14px 12px;
+  }
+  .document-pair {
+    gap: 8px;
+  }
+  .document-side {
+    padding: 6px;
+  }
+  .document-side-heading small {
+    display: none;
+  }
+  .controls-panel section {
+    padding: 18px 15px;
   }
   .privacy {
     display: none;
