@@ -1,6 +1,6 @@
 import { GetServerSideProps } from 'next';
 
-const EXTERNAL_DATA_URL = 'https://youjing.dev';
+const EXTERNAL_DATA_URL = 'https://www.youjing.dev';
 
 function generateSiteMap(pages: string[]) {
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -32,6 +32,7 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
     '/',
     '/palang-ic',
     '/id-marking',
+    '/palang-ic/desktop',
     '/blogs',
     '/work',
   ];
@@ -48,4 +49,4 @@ export const getServerSideProps: GetServerSideProps = async ({ res }) => {
   };
 };
 
-export default SiteMap; 
+export default SiteMap;

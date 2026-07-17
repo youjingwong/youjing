@@ -60,6 +60,10 @@ module.exports = {
         headers: privacyToolHeaders,
       },
       {
+        source: '/palang-ic/desktop/success',
+        headers: privacyToolHeaders,
+      },
+      {
         source: '/sitemap.xml',
         headers: [
           {

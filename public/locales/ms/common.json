@@ -46,5 +46,127 @@
   "privacyUploadHint": "Kekal pada peranti anda — tidak pernah dimuat naik.",
   "clearImages": "Kosongkan imej",
   "processingImage": "Sedang diproses secara setempat…",
-  "imageLoadError": "Imej ini tidak dapat dibuka. Sila pilih fail lain."
+  "imageLoadError": "Imej ini tidak dapat dibuka. Sila pilih fail lain.",
+  "desktop": {
+    "promo": {
+      "badge": "Aplikasi desktop",
+      "title": "Pastikan profil anda sedia untuk kegunaan seterusnya",
+      "body": "Palang IC Desktop menyimpan imej IC, tetapan tanda air dan pilihan eksport anda dalam peti besi disulitkan pada komputer ini—tanpa memuat naik imej anda.",
+      "localVault": "Peti besi setempat disulitkan",
+      "persistent": "Profil dan tetapan dikekalkan",
+      "noUpload": "Tiada muat naik imej",
+      "oneTime": "Pembelian sekali sahaja",
+      "cta": "Lihat aplikasi desktop"
+    },
+    "sales": {
+      "seoTitle": "Palang IC Desktop — Aplikasi Tanda Air MyKad Peribadi | RM29.90",
+      "seoDescription": "Beli Palang IC Desktop sekali dengan harga RM29.90. Simpan profil IC dan tetapan tanda air secara setempat, dengan pemasang untuk Mac Apple Silicon, Mac Intel dan Windows x64.",
+      "backToTool": "Kembali ke alat Palang IC percuma",
+      "badge": "Aplikasi desktop peribadi dan luar talian",
+      "title": "Profil IC anda, sedia apabila diperlukan",
+      "intro": "Simpan profil disulitkan dan tetapan tanda air boleh guna semula secara setempat pada Mac atau PC Windows anda. Imej IC kekal pada komputer dan tidak pernah dimuat naik oleh aplikasi.",
+      "buyFor": "Beli pada harga",
+      "oneTime": "Pembelian sekali sahaja",
+      "noSubscription": "Tiada langganan, akaun dalam aplikasi atau penyegerakan awan",
+      "productImageAlt": "Ilustrasi pengeditan MyKad yang dilindungi dalam aplikasi desktop setempat",
+      "benefitsTitle": "Dibina untuk kegunaan berulang secara peribadi",
+      "benefitsIntro": "Aplikasi desktop memberi kemudahan profil tersimpan tanpa menjadikan dokumen pengenalan anda sebagai perkhidmatan awan.",
+      "benefits": {
+        "vault": {
+          "title": "Peti besi setempat disulitkan",
+          "body": "Imej profil disulitkan semasa disimpan dan dikekalkan dalam peti besi setempat aplikasi pada komputer ini."
+        },
+        "persistence": {
+          "title": "Profil dan tetapan dikekalkan",
+          "body": "Buka semula imej hadapan dan belakang dengan kedudukan tanda air, pelarasan imej dan pilihan eksport anda tersedia."
+        },
+        "offline": {
+          "title": "Tiada muat naik imej",
+          "body": "Penyuntingan dan eksport dilakukan secara setempat. Aplikasi tidak mempunyai penyegerakan awan dan tidak menghantar imej IC ke pelayan kami."
+        }
+      },
+      "installersTitle": "Satu pembelian, ketiga-tiga pemasang",
+      "installersIntro": "Portal muat turun selamat anda merangkumi keluaran semasa bagi setiap platform desktop yang disokong.",
+      "appLanguages": "Antara muka aplikasi desktop tersedia dalam Bahasa Melayu dan bahasa Inggeris.",
+      "installers": {
+        "macArm": {
+          "label": "Mac — Apple Silicon",
+          "detail": "Untuk Mac dengan cip Apple siri M. Pemasang DMG."
+        },
+        "macIntel": {
+          "label": "Mac — Intel",
+          "detail": "Untuk Mac berasaskan Intel. Pemasang DMG."
+        },
+        "windows": {
+          "label": "Windows — x64",
+          "detail": "Untuk PC Windows 64-bit. Pemasang EXE."
+        }
+      },
+      "deliveryTitle": "Cara pembayaran dan penghantaran berfungsi",
+      "delivery": {
+        "pay": {
+          "title": "Masukkan e-mel dan teruskan",
+          "body": "Kami mencipta pesanan peribadi berharga RM29.90 dan membawa anda ke halaman pembayaran Airwallex."
+        },
+        "confirm": {
+          "title": "Pembayaran disahkan dengan selamat",
+          "body": "Airwallex mengendalikan butiran pembayaran anda. Muat turun hanya dibuka selepas kami menerima pengesahan pembayaran yang disahkan."
+        },
+        "download": {
+          "title": "Pilih pemasang anda",
+          "body": "Gunakan portal muat turun selamat selepas pembayaran. Kami juga menghantar akses ke alamat e-mel yang digunakan semasa pembayaran."
+        }
+      },
+      "checkout": {
+        "product": "Palang IC Desktop",
+        "title": "Pembayaran selamat",
+        "emailLabel": "Alamat e-mel",
+        "emailHelp": "Kami menggunakannya untuk pengesahan pembayaran, akses muat turun dan sokongan pembelian anda.",
+        "emailPlaceholder": "anda@contoh.com",
+        "emailError": "Masukkan alamat e-mel yang sah untuk meneruskan.",
+        "rateLimitError": "Terlalu banyak percubaan pembayaran. Tunggu sebentar dan cuba lagi.",
+        "genericError": "Pembayaran tidak dapat dimulakan. Sila cuba lagi sebentar lagi.",
+        "releaseGate": "Pembayaran akan dibuka selepas pemasang Mac dan Windows yang ditandatangani selesai melalui pengesahan keluaran.",
+        "unavailableAction": "Pembayaran dibuka selepas pengesahan keluaran",
+        "loading": "Membuka pembayaran selamat…",
+        "hostedTitle": "Pembayaran dihoskan oleh Airwallex.",
+        "hostedBody": "Anda akan meninggalkan laman ini untuk memasukkan butiran pembayaran pada pembayaran selamat Airwallex. Kami tidak menerima atau menyimpan butiran penuh kad anda.",
+        "accessWindow": "Akses muat turun selamat anda sah selama 30 hari dari tarikh pembelian. Hubungi sokongan jika anda memerlukan bantuan selepas ia tamat tempoh."
+      },
+      "policiesTitle": "Maklumat pembelian",
+      "supportTitle": "Sokongan melalui e-mel",
+      "supportBody": "Untuk bantuan muat turun, akses atau pemasangan, e-mel kami. Kami akan membalas secepat yang munasabah; pembelian ini tidak termasuk tempoh respons yang dijamin.",
+      "refundTitle": "Bayaran balik dan keserasian",
+      "refundBody": "Sila semak platform yang disenaraikan sebelum membeli. Oleh sebab akses digital dihantar serta-merta, bayaran balik kerana berubah fikiran tidak dijanjikan. Hubungi kami untuk caj berganda, fail yang tidak boleh diakses atau masalah penting yang kekal selepas penyelesaian masalah; kami akan membetulkan isu atau memberikan bayaran balik apabila sesuai. Hak berkanun anda tidak terjejas.",
+      "privacyTitle": "Maklumat yang meninggalkan peranti anda",
+      "privacyBody": "Pembayaran menghantar e-mel dan butiran pesanan anda kepada perkhidmatan pembayaran dan penghantaran kami. Aplikasi desktop itu sendiri tidak memuat naik imej IC dan tidak mempunyai penyegerakan awan.",
+      "useWebTool": "Gunakan alat pelayar percuma"
+    },
+    "success": {
+      "seoTitle": "Pembelian Palang IC Desktop anda",
+      "seoDescription": "Sahkan pembayaran Palang IC Desktop dan akses pemasang anda.",
+      "backToProduct": "Palang IC Desktop",
+      "checkingTitle": "Menyemak pembelian anda",
+      "checkingBody": "Kami sedang mencari pesanan anda dengan selamat dan menyemak status pembayarannya.",
+      "pendingTitle": "Pengesahan pembayaran sedang diproses",
+      "pendingBody": "Airwallex masih mengesahkan pembayaran dengan kami. Halaman ini akan dikemas kini secara automatik apabila muat turun anda sedia.",
+      "safeToWait": "Sila biarkan tab ini terbuka. Memuat semula adalah selamat dalam tab yang sama dan kami juga akan menghantar akses melalui e-mel selepas pembayaran disahkan.",
+      "paidTitle": "Pembayaran disahkan",
+      "paidBody": "Terima kasih kerana membeli Palang IC Desktop. Ketiga-tiga pemasang disertakan dalam pembelian anda.",
+      "chooseInstaller": "Pilih pemasang",
+      "allIncluded": "Muat turun versi untuk komputer ini sekarang. Anda boleh kembali melalui pautan e-mel selamat bagi platform lain.",
+      "preparingDownload": "Menyediakan…",
+      "download": "Muat turun selamat",
+      "downloadError": "Kami tidak dapat menyediakan muat turun itu. Sila cuba lagi atau hubungi sokongan jika masalah berterusan.",
+      "emailTitle": "Pautan portal selamat turut dihantar melalui e-mel.",
+      "emailBody": "Simpan mesej itu jika anda perlu kembali untuk platform lain yang disokong atau memuat turun keluaran sekali lagi selagi akses masih tersedia.",
+      "errorTitle": "Kami tidak dapat menyemak pembelian ini",
+      "errorBody": "Perkhidmatan pesanan mungkin tidak tersedia buat sementara waktu atau pautan akses ini mungkin tidak lagi sah. Cuba lagi atau hubungi kami menggunakan e-mel yang digunakan semasa pembayaran.",
+      "missingTitle": "Pautan pembelian ini tidak lengkap",
+      "missingBody": "Buka pautan selamat daripada halaman kembali pembayaran atau e-mel penghantaran anda. Jika anda telah membayar dan tidak dapat menemuinya, hubungi sokongan.",
+      "tryAgain": "Cuba lagi",
+      "contactSupport": "Hubungi sokongan",
+      "footer": "Muat turun hanya dikeluarkan selepas pengesahan pembayaran yang disahkan."
+    }
+  }
 }

@@ -46,5 +46,127 @@
   "privacyUploadHint": "图片保留在您的设备上，绝不上传。",
   "clearImages": "清除图片",
   "processingImage": "正在本地处理…",
-  "imageLoadError": "无法打开此图片，请选择其他文件。"
+  "imageLoadError": "无法打开此图片，请选择其他文件。",
+  "desktop": {
+    "promo": {
+      "badge": "桌面应用",
+      "title": "下次打开时，个人资料仍已准备就绪",
+      "body": "Palang IC Desktop 会将身份证图片、水印设置和导出偏好保存在此电脑的加密保险库中，全程无需上传图片。",
+      "localVault": "本地加密保险库",
+      "persistent": "保留个人资料和设置",
+      "noUpload": "不上传图片",
+      "oneTime": "一次性购买",
+      "cta": "查看桌面应用"
+    },
+    "sales": {
+      "seoTitle": "Palang IC Desktop — 私密 MyKad 水印应用 | RM29.90",
+      "seoDescription": "一次性支付 RM29.90 购买 Palang IC Desktop。在本地保存加密身份证资料和水印设置，并获得 Apple Silicon Mac、Intel Mac 和 Windows x64 安装程序。",
+      "backToTool": "返回免费 Palang IC 工具",
+      "badge": "私密、离线的桌面应用",
+      "title": "需要时，身份证资料已为您准备就绪",
+      "intro": "在 Mac 或 Windows 电脑上本地保存加密资料和可重复使用的水印设置。应用不会上传您的身份证图片，图片始终留在电脑上。",
+      "buyFor": "购买价格",
+      "oneTime": "一次性购买",
+      "noSubscription": "无订阅、无应用内账户、无云端同步",
+      "productImageAlt": "在本地桌面应用中保护 MyKad 编辑的示意图",
+      "benefitsTitle": "为私密、重复使用而设计",
+      "benefitsIntro": "桌面应用让您享受保存资料的便利，同时不会把身份证件变成云端服务中的数据。",
+      "benefits": {
+        "vault": {
+          "title": "本地加密保险库",
+          "body": "资料图片以加密方式静态保存，并留在此电脑上的应用本地保险库中。"
+        },
+        "persistence": {
+          "title": "保留个人资料和设置",
+          "body": "重新打开正反面图片时，水印位置、图片调整和导出偏好仍已准备就绪。"
+        },
+        "offline": {
+          "title": "不上传图片",
+          "body": "编辑和导出均在本地完成。应用不提供云端同步，也不会把身份证图片发送到我们的服务器。"
+        }
+      },
+      "installersTitle": "一次购买，包含三种安装程序",
+      "installersIntro": "您的安全下载门户包含每个受支持桌面平台的当前版本。",
+      "appLanguages": "桌面应用界面提供英语和马来语。",
+      "installers": {
+        "macArm": {
+          "label": "Mac — Apple Silicon",
+          "detail": "适用于搭载 Apple M 系列芯片的 Mac。DMG 安装程序。"
+        },
+        "macIntel": {
+          "label": "Mac — Intel",
+          "detail": "适用于采用 Intel 处理器的 Mac。DMG 安装程序。"
+        },
+        "windows": {
+          "label": "Windows — x64",
+          "detail": "适用于 64 位 Windows 电脑。EXE 安装程序。"
+        }
+      },
+      "deliveryTitle": "付款与交付方式",
+      "delivery": {
+        "pay": {
+          "title": "输入电子邮箱并继续",
+          "body": "我们会创建一笔 RM29.90 的私人订单，并将您带到 Airwallex 托管的付款页面。"
+        },
+        "confirm": {
+          "title": "安全确认付款",
+          "body": "Airwallex 处理您的付款资料。只有在我们收到经验证的付款确认后，下载才会开放。"
+        },
+        "download": {
+          "title": "选择安装程序",
+          "body": "付款后可使用安全下载门户。我们也会将访问方式发送到结账时使用的邮箱。"
+        }
+      },
+      "checkout": {
+        "product": "Palang IC Desktop",
+        "title": "安全结账",
+        "emailLabel": "电子邮箱",
+        "emailHelp": "此邮箱将用于付款确认、下载访问和购买支持。",
+        "emailPlaceholder": "you@example.com",
+        "emailError": "请输入有效的电子邮箱以继续。",
+        "rateLimitError": "结账尝试次数过多，请稍候再试。",
+        "genericError": "暂时无法开始结账，请稍后再试。",
+        "releaseGate": "签名后的 Mac 和 Windows 安装程序通过发布验证后，结账功能将开放。",
+        "unavailableAction": "发布验证后开放购买",
+        "loading": "正在打开安全结账页面…",
+        "hostedTitle": "付款由 Airwallex 托管。",
+        "hostedBody": "您将离开本站，在 Airwallex 的安全结账页面输入付款资料。我们不会接收或保存您的完整银行卡资料。",
+        "accessWindow": "安全下载权限自购买之日起有效 30 天。到期后如需帮助，请联系支持。"
+      },
+      "policiesTitle": "购买信息",
+      "supportTitle": "电子邮件支持",
+      "supportBody": "如需下载、访问或安装方面的协助，请给我们发送邮件。我们会在合理范围内尽快回复；本次购买不包含保证的响应时限。",
+      "refundTitle": "退款与兼容性",
+      "refundBody": "购买前请检查列出的平台。由于数字下载访问会立即交付，我们不承诺因改变主意而退款。如遇重复扣款、无法访问文件，或排查后仍存在严重问题，请联系我们；我们会酌情修复问题或退款。您的法定权利不受影响。",
+      "privacyTitle": "哪些信息会离开您的设备",
+      "privacyBody": "结账时，您的邮箱和订单资料会发送给我们的付款与交付服务。桌面应用本身不会上传身份证图片，也不提供云端同步。",
+      "useWebTool": "使用免费浏览器工具"
+    },
+    "success": {
+      "seoTitle": "您的 Palang IC Desktop 购买",
+      "seoDescription": "确认 Palang IC Desktop 付款并访问安装程序。",
+      "backToProduct": "Palang IC Desktop",
+      "checkingTitle": "正在检查您的购买",
+      "checkingBody": "我们正在安全查找您的订单并检查付款状态。",
+      "pendingTitle": "正在等待付款确认",
+      "pendingBody": "Airwallex 仍在向我们确认付款。下载准备好后，此页面会自动更新。",
+      "safeToWait": "请保持此标签页开启。在同一标签页刷新是安全的；付款确认后，我们也会通过电子邮件发送访问方式。",
+      "paidTitle": "付款已确认",
+      "paidBody": "感谢您购买 Palang IC Desktop。本次购买包含全部三种安装程序。",
+      "chooseInstaller": "选择安装程序",
+      "allIncluded": "现在可下载适合此电脑的版本。您也可通过安全邮件链接返回并获取其他平台版本。",
+      "preparingDownload": "正在准备…",
+      "download": "安全下载",
+      "downloadError": "暂时无法准备该下载。请重试；如果问题持续，请联系支持。",
+      "emailTitle": "安全门户链接也会通过电子邮件发送。",
+      "emailBody": "请保留该邮件，以便在访问仍然有效期间返回下载其他受支持的平台版本或再次下载当前版本。",
+      "errorTitle": "无法检查此次购买",
+      "errorBody": "订单服务可能暂时不可用，或此访问链接已失效。请重试，或使用结账时的电子邮箱联系我们。",
+      "missingTitle": "此购买链接不完整",
+      "missingBody": "请打开付款返回页面或交付邮件中的安全链接。如果您已付款但找不到链接，请联系支持。",
+      "tryAgain": "重试",
+      "contactSupport": "联系支持",
+      "footer": "只有在收到经验证的付款确认后才会开放下载。"
+    }
+  }
 }

@@ -4,6 +4,8 @@ Personal site and the Palang IC browser-based watermarking tool.
 
 The Electron desktop application lives in [`desktop/`](desktop/README.md) and is intentionally isolated from the website build.
 
+The paid desktop sales flow, Airwallex checkout, webhook fulfillment, email delivery, and private installer storage are documented in [`docs/palang-desktop-sales.md`](docs/palang-desktop-sales.md).
+
 ## Getting started
 
 Install dependencies and run the development server:

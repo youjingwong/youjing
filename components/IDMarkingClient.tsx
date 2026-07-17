@@ -1,4 +1,5 @@
 import { useTranslation } from 'next-i18next/pages';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
   useEffect,
@@ -1612,6 +1613,65 @@ export default function IDMarkingClient() {
           </ul>
           <div className="mt-4 text-xs leading-5 text-gray-400">
             {t('privacySession')}
+          </div>
+        </section>
+
+        <section
+          aria-labelledby="desktop-promo-title"
+          className="mb-8 overflow-hidden rounded-xl border border-emerald-700/60 bg-gray-900 shadow-sm"
+        >
+          <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[1fr_auto] lg:items-center">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-700/70 bg-emerald-950/70 px-3 py-1 text-xs font-semibold text-emerald-300">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                >
+                  <rect x="3" y="4" width="18" height="14" rx="2" />
+                  <path d="M8 22h8" />
+                  <path d="M12 18v4" />
+                </svg>
+                {t('desktop.promo.badge')}
+              </div>
+              <h2 id="desktop-promo-title" className="mt-3 text-2xl text-white">
+                {t('desktop.promo.title')}
+              </h2>
+              <p className="mb-0 mt-2 max-w-3xl text-sm leading-6 text-gray-300">
+                {t('desktop.promo.body')}
+              </p>
+              <ul className="mt-4 flex flex-wrap gap-2 text-xs text-gray-200 sm:text-sm">
+                <li className="rounded-full border border-gray-700 bg-gray-950/70 px-3 py-1.5">
+                  <span aria-hidden="true" className="text-emerald-400">✓</span>{' '}
+                  {t('desktop.promo.localVault')}
+                </li>
+                <li className="rounded-full border border-gray-700 bg-gray-950/70 px-3 py-1.5">
+                  <span aria-hidden="true" className="text-emerald-400">✓</span>{' '}
+                  {t('desktop.promo.persistent')}
+                </li>
+                <li className="rounded-full border border-gray-700 bg-gray-950/70 px-3 py-1.5">
+                  <span aria-hidden="true" className="text-emerald-400">✓</span>{' '}
+                  {t('desktop.promo.noUpload')}
+                </li>
+              </ul>
+            </div>
+            <div className="flex min-w-48 flex-col items-stretch gap-3 rounded-lg border border-gray-700 bg-black/40 p-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-white">RM29.90</div>
+                <div className="text-xs text-gray-400">{t('desktop.promo.oneTime')}</div>
+              </div>
+              <Link
+                href="/palang-ic/desktop"
+                className="inline-flex min-h-11 items-center justify-center rounded-md bg-emerald-400 px-5 py-2.5 text-sm font-bold text-emerald-950 transition-colors hover:bg-emerald-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300"
+              >
+                {t('desktop.promo.cta')}
+              </Link>
+            </div>
           </div>
         </section>
 

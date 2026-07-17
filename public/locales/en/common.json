@@ -46,5 +46,127 @@
   "privacyUploadHint": "Stays on your device — never uploaded.",
   "clearImages": "Clear images",
   "processingImage": "Processing locally…",
-  "imageLoadError": "This image could not be opened. Please choose another file."
+  "imageLoadError": "This image could not be opened. Please choose another file.",
+  "desktop": {
+    "promo": {
+      "badge": "Desktop app",
+      "title": "Keep your profiles ready for next time",
+      "body": "Palang IC Desktop stores your ID images, watermark settings, and export preferences in an encrypted vault on this computer—without uploading your images.",
+      "localVault": "Encrypted local vault",
+      "persistent": "Profiles and settings persist",
+      "noUpload": "No image uploads",
+      "oneTime": "One-time purchase",
+      "cta": "See the desktop app"
+    },
+    "sales": {
+      "seoTitle": "Palang IC Desktop — Private MyKad Watermarking App | RM29.90",
+      "seoDescription": "Buy Palang IC Desktop for RM29.90 once. Keep encrypted ID profiles and watermark settings locally, with installers for Apple Silicon Mac, Intel Mac, and Windows x64.",
+      "backToTool": "Back to the free Palang IC tool",
+      "badge": "Private, offline desktop app",
+      "title": "Your ID profiles, ready when you need them",
+      "intro": "Save encrypted profiles and reusable watermark settings locally on your Mac or Windows PC. Your ID images stay on your computer and are never uploaded by the app.",
+      "buyFor": "Buy for",
+      "oneTime": "One-time purchase",
+      "noSubscription": "No subscription, in-app account, or cloud sync",
+      "productImageAlt": "Illustration of protected MyKad editing in a local desktop app",
+      "benefitsTitle": "Built for private, repeat use",
+      "benefitsIntro": "The desktop app keeps the convenience of saved profiles without turning your identity documents into a cloud service.",
+      "benefits": {
+        "vault": {
+          "title": "Encrypted local vault",
+          "body": "Profile images are encrypted at rest and kept in the app's local vault on this computer."
+        },
+        "persistence": {
+          "title": "Profiles and settings persist",
+          "body": "Reopen saved front and back images with your watermark placement, image adjustments, and export preferences ready."
+        },
+        "offline": {
+          "title": "No image uploads",
+          "body": "Editing and export run locally. The app has no cloud sync and does not send your ID images to our servers."
+        }
+      },
+      "installersTitle": "One purchase, all three installers",
+      "installersIntro": "Your secure download portal includes the current release for each supported desktop platform.",
+      "appLanguages": "The desktop app interface is available in English and Bahasa Melayu.",
+      "installers": {
+        "macArm": {
+          "label": "Mac — Apple Silicon",
+          "detail": "For Macs with an M-series Apple chip. DMG installer."
+        },
+        "macIntel": {
+          "label": "Mac — Intel",
+          "detail": "For Intel-based Macs. DMG installer."
+        },
+        "windows": {
+          "label": "Windows — x64",
+          "detail": "For 64-bit Windows PCs. EXE installer."
+        }
+      },
+      "deliveryTitle": "How payment and delivery work",
+      "delivery": {
+        "pay": {
+          "title": "Enter your email and continue",
+          "body": "We create a private order for RM29.90 and send you to Airwallex's hosted payment page."
+        },
+        "confirm": {
+          "title": "Payment is confirmed securely",
+          "body": "Airwallex handles your payment details. Downloads unlock only after we receive verified payment confirmation."
+        },
+        "download": {
+          "title": "Choose your installer",
+          "body": "Use the secure download portal after payment. We also email access to the address used at checkout."
+        }
+      },
+      "checkout": {
+        "product": "Palang IC Desktop",
+        "title": "Secure checkout",
+        "emailLabel": "Email address",
+        "emailHelp": "We use this for payment confirmation, download access, and purchase support.",
+        "emailPlaceholder": "you@example.com",
+        "emailError": "Enter a valid email address to continue.",
+        "rateLimitError": "There have been too many checkout attempts. Wait a moment and try again.",
+        "genericError": "Checkout could not be started. Please try again shortly.",
+        "releaseGate": "Checkout will open after the signed Mac and Windows installers complete release verification.",
+        "unavailableAction": "Checkout opens after release verification",
+        "loading": "Opening secure checkout…",
+        "hostedTitle": "Payment is hosted by Airwallex.",
+        "hostedBody": "You will leave this site to enter payment details on Airwallex's secure checkout. We do not receive or store your full card details.",
+        "accessWindow": "Your secure download access lasts 30 days from purchase. Contact support if you need help after it expires."
+      },
+      "policiesTitle": "Purchase information",
+      "supportTitle": "Email support",
+      "supportBody": "For download, access, or installation help, email us. We reply as soon as reasonably possible; this purchase does not include a guaranteed response time.",
+      "refundTitle": "Refunds and compatibility",
+      "refundBody": "Please check the listed platforms before buying. Because digital access is delivered immediately, change-of-mind refunds are not promised. Contact us for duplicate charges, inaccessible files, or a material problem that remains after troubleshooting; we will fix the issue or refund where appropriate. Your statutory rights are not affected.",
+      "privacyTitle": "What leaves your device",
+      "privacyBody": "Checkout sends your email and order details to our payment and delivery services. The desktop app itself does not upload your ID images and has no cloud sync.",
+      "useWebTool": "Use the free browser tool"
+    },
+    "success": {
+      "seoTitle": "Your Palang IC Desktop purchase",
+      "seoDescription": "Confirm your Palang IC Desktop payment and access your installers.",
+      "backToProduct": "Palang IC Desktop",
+      "checkingTitle": "Checking your purchase",
+      "checkingBody": "We are securely finding your order and checking its payment status.",
+      "pendingTitle": "Payment confirmation is on its way",
+      "pendingBody": "Airwallex is still confirming the payment with us. This page will update automatically when your downloads are ready.",
+      "safeToWait": "Please keep this tab open. Refreshing is safe in the same tab, and we will also email access after payment is confirmed.",
+      "paidTitle": "Payment confirmed",
+      "paidBody": "Thank you for buying Palang IC Desktop. All three installers are included in your purchase.",
+      "chooseInstaller": "Choose an installer",
+      "allIncluded": "Download the version for this computer now. You can return through your secure email link for the other platforms.",
+      "preparingDownload": "Preparing…",
+      "download": "Secure download",
+      "downloadError": "We could not prepare that download. Please try again, or contact support if it continues.",
+      "emailTitle": "A secure portal link is also sent by email.",
+      "emailBody": "Keep that message if you need to return for another supported platform or download the release again while access remains available.",
+      "errorTitle": "We could not check this purchase",
+      "errorBody": "The order service may be temporarily unavailable, or this access link may no longer be valid. Try again or contact us with the email used at checkout.",
+      "missingTitle": "This purchase link is incomplete",
+      "missingBody": "Open the secure link from your payment return or delivery email. If you have paid and cannot find it, contact support.",
+      "tryAgain": "Try again",
+      "contactSupport": "Contact support",
+      "footer": "Downloads are released only after verified payment confirmation."
+    }
+  }
 }
